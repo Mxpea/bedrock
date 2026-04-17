@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Django
+*.log
+db.sqlite3
+media/
+staticfiles/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Test
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
