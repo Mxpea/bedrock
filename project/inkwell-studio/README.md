@@ -13,7 +13,7 @@
 - Markdown 内容存储与基础安全 HTML 渲染
 - Celery 异步任务占位（文档转 HTML 流程接口）
 
-## 快速启动
+## 快速启动（Docker）
 
 1. 复制环境变量
 
@@ -31,6 +31,86 @@ docker compose up --build
 
 - API 根路径: `http://localhost/api/`
 - 管理后台: `http://localhost/admin/`
+
+## 本地运行（非 Docker）
+
+本地运行默认使用开发配置：SQLite + Celery 同步执行（无需 Redis/PostgreSQL）。
+
+### 一键启动（推荐）
+
+```powershell
+./scripts/start_local.ps1
+```
+
+可选参数：
+
+- `-SkipInstall` 跳过依赖安装
+- `-SkipMigrate` 跳过迁移
+- `-UsePostgres` 使用本地 PostgreSQL（不使用 SQLite）
+
+如果 PowerShell 执行策略受限，也可以使用：
+
+```powershell
+./scripts/start_local.bat
+```
+
+### 1) 创建并激活虚拟环境（Windows PowerShell）
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+### 2) 安装依赖
+
+```powershell
+pip install -r requirements.txt
+```
+
+如果你要用本地 PostgreSQL，再额外安装：
+
+```powershell
+pip install -r requirements-postgres.txt
+```
+
+### 3) 设置开发环境变量
+
+```powershell
+$env:DJANGO_SETTINGS_MODULE="config.settings.development"
+$env:DEV_USE_SQLITE="True"
+```
+
+### 4) 迁移并创建管理员
+
+```powershell
+python manage.py migrate
+python manage.py createsuperuser
+```
+
+### 5) 启动服务
+
+```powershell
+python manage.py runserver 0.0.0.0:8000
+```
+
+访问地址：
+
+- API 根路径: `http://127.0.0.1:8000/api/`
+- 管理后台: `http://127.0.0.1:8000/admin/`
+
+### 可选：切回本地 PostgreSQL
+
+如果你本机已安装 PostgreSQL，可以设置：
+
+```powershell
+$env:DEV_USE_SQLITE="False"
+$env:POSTGRES_DB="bedrock"
+$env:POSTGRES_USER="bedrock"
+$env:POSTGRES_PASSWORD="bedrock"
+$env:POSTGRES_HOST="127.0.0.1"
+$env:POSTGRES_PORT="5432"
+python manage.py migrate
+```
 
 ## 关键接口
 

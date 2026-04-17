@@ -1,0 +1,3 @@
+# Install this only when you use PostgreSQL locally.
+# psycopg v3 binary wheel avoids pg_config build requirements on most platforms.
+psycopg[binary]==3.2.9
