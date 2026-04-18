@@ -5,6 +5,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.views.generic import TemplateView
 
+from apps.customization.markdown_extensions import sanitize_advanced_content, sanitize_standard_content
 from apps.novels.models import Chapter, Novel
 
 User = get_user_model()
@@ -126,6 +127,11 @@ class ReaderPageView(TemplateView):
         context.update(
             {
                 "chapter": chapter,
+                "chapter_rendered_html": (
+                    sanitize_advanced_content(chapter.content_md)
+                    if chapter._author_has_advanced_markdown_access()
+                    else sanitize_standard_content(chapter.content_md)
+                ),
                 "chapter_list": chapter_list_qs,
                 "prev_chapter_id": prev_chapter_id,
                 "next_chapter_id": next_chapter_id,

@@ -3,15 +3,23 @@
 <div class="editor-workspace fade-in">
     <!-- 1. 左侧：章节树状列表 (Upstream) -->
     <aside class="editor-left-panel">
-        <details class="chapter-fold" open>
-            <summary class="chapter-fold-summary">
-                <span class="eyebrow" style="margin: 0;">正文章节</span>
+        <div class="editor-panel-head">
+            <span class="eyebrow" style="margin: 0;">正文章节</span>
+            <div class="panel-head-actions">
+                <button type="button" class="icon-btn small" id="btn-toggle-chapters" title="收起章节栏" aria-label="收起章节栏">◀</button>
                 <button class="icon-btn small" id="btn-new-chapter" title="新建章节" style="font-size: 1rem; border: none; background: transparent; cursor: pointer;">+</button>
-            </summary>
-            <div class="chapter-list-nav" id="chapter-list-container">
-                <p class="text-muted" style="text-align: center; margin-top: 24px; font-size: 0.85rem;">加载中...</p>
             </div>
-        </details>
+        </div>
+        <div class="editor-panel-body">
+            <details class="chapter-fold" open>
+                <summary class="chapter-fold-summary">
+                    <span class="eyebrow" style="margin: 0;">章节列表</span>
+                </summary>
+                <div class="chapter-list-nav" id="chapter-list-container">
+                    <p class="text-muted" style="text-align: center; margin-top: 24px; font-size: 0.85rem;">加载中...</p>
+                </div>
+            </details>
+        </div>
     </aside>
 
     <!-- 2. 中间：Markdown 编辑器 (Downstream) -->
@@ -29,9 +37,20 @@
                 <button class="tool-btn txt-icon" data-prefix="> " title="引用块">”</button>
                 <button class="tool-btn txt-icon" data-prefix="- " title="无序列表">•</button>
                 <div class="divider"></div>
+                <!-- 对齐与媒体 -->
+                <button class="tool-btn txt-icon" data-start="{左对齐|" data-end="}" title="左对齐">左</button>
+                <button class="tool-btn txt-icon" data-start="{居中|" data-end="}" title="居中">中</button>
+                <button class="tool-btn txt-icon" data-start="{右对齐|" data-end="}" title="右对齐">右</button>
+                <button class="tool-btn txt-icon" data-action="insert-link" title="插入超链接">🔗</button>
+                <button class="tool-btn txt-icon" data-action="upload-image" title="上传图像">🖼️</button>
+                <input id="inline-image-input" type="file" accept="image/*" hidden>
+                <div class="divider"></div>
                 <!-- 扩展语法交互 -->
                 <button class="tool-btn syntax-custom" data-start="{高亮|" data-end="}" title="插入特殊高亮块">{高亮}</button>
                 <button class="tool-btn syntax-custom" data-start="{波浪|" data-end="}" title="文字波浪下划线">{波浪}</button>
+                <button class="tool-btn syntax-custom" data-start="{模糊|" data-end="}" title="模糊文字，悬停可显示">{模糊}</button>
+                <button class="tool-btn syntax-custom" data-ruby="true" title="注音：优先使用当前选中文本">{注音}</button>
+                <button class="tool-btn syntax-custom" data-start="{刮刮卡|" data-end="}" title="刮刮卡遮罩文字">{刮刮卡}</button>
                 <button class="tool-btn syntax-custom" data-start="{抖动|" data-end="}" title="文字随机抖动，营造慌张感">{抖动}</button>
                 <button class="tool-btn syntax-custom" data-start="{晃动|" data-end="}" title="文字上下波浪形晃动">{晃动}</button>
                 <!-- 数据库插入 -->
@@ -46,46 +65,59 @@
             
             <div class="tool-group right">
                 <span class="editor-context" id="editor-workspace-label">工作区</span>
-                <button class="icon-btn" id="btn-toggle-workspace-nav" title="折叠工作区导航" style="border: none; background: transparent; cursor: pointer;"><i class="ph ph-layout"></i></button>
                 <span class="status-msg text-muted" id="save-status" style="font-size: 0.8rem; margin-right: 12px;"></span>
                 <button class="button secondary small" id="btn-preview">阅读预览</button>
                 <button class="button primary small" id="btn-save">保存</button>
-                <button class="icon-btn" id="btn-toggle-side" title="切换辅助面板" style="border: none; background: transparent; cursor: pointer;"><i class="ph ph-sidebar-simple"></i></button>
             </div>
         </div>
         
-        <div class="editor-scroll-area" style="flex: 1; overflow-y: auto;">
-            <div class="editor-body">
-                <input type="text" id="chapter-title-input" class="chapter-title-input" value="" placeholder="输入章节标题..." autocomplete="off"/>
-                <textarea id="main-editor-area" class="chapter-content-input" placeholder="在这里开始创作正文..."></textarea>
+        <div class="editor-scroll-area">
+            <div class="editor-canvas" id="editor-canvas">
+                <div class="editor-body">
+                    <input type="text" id="chapter-title-input" class="chapter-title-input" value="" placeholder="输入章节标题..." autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" data-gramm="false"/>
+                    <textarea id="main-editor-area" class="chapter-content-input" placeholder="在这里开始创作正文..." spellcheck="false" autocapitalize="off" autocorrect="off" data-gramm="false"></textarea>
+                </div>
+                <aside class="editor-live-preview" id="editor-live-preview">
+                    <div class="editor-live-preview-head">
+                        <span>实时预览</span>
+                        <button type="button" class="layout-toggle-btn compact" id="btn-toggle-live-preview" title="收起实时预览">◀</button>
+                    </div>
+                    <article class="editor-live-preview-body" id="editor-live-preview-body"></article>
+                </aside>
             </div>
         </div>
     </main>
 
     <!-- 3. 右侧：可收缩侧边栏 (Context) -->
     <aside class="editor-side-panel" id="editor-right-panel">
-        <div class="panel-tabs">
-            <button class="tab-btn active" data-target="tab-info" title="章节信息">ℹ️ 信息</button>
-            <button class="tab-btn" data-target="tab-comments" title="本章吐槽">💬 吐槽</button>
-            <button class="tab-btn" data-target="tab-quotes" title="快速引用">🔗 引用</button>
+        <div class="editor-panel-head">
+            <span class="eyebrow" style="margin: 0;">辅助面板</span>
+            <button type="button" class="layout-toggle-btn compact" id="btn-toggle-side" title="收起辅助面板">▶</button>
         </div>
-        <div class="panel-content">
-            <!-- Info Tab -->
-            <div id="tab-info" class="tab-pane active" style="display: flex; flex-direction: column; gap: 12px;">
-                <div style="background: var(--bg); padding: 12px; border-radius: 8px; border: 1px solid var(--line);">
-                    <p id="word-count" style="font-size: 0.85rem; margin: 0 0 4px; font-weight: bold; color: var(--accent);">字数：0</p>
-                    <p id="chapter-status" class="text-muted" style="font-size: 0.8rem; margin: 0;">状态：加载中</p>
+        <div class="editor-panel-body">
+            <div class="panel-tabs">
+                <button class="tab-btn active" data-target="tab-info" title="章节信息">ℹ️ 信息</button>
+                <button class="tab-btn" data-target="tab-comments" title="本章吐槽">💬 吐槽</button>
+                <button class="tab-btn" data-target="tab-quotes" title="快速引用">🔗 引用</button>
+            </div>
+            <div class="panel-content">
+                <!-- Info Tab -->
+                <div id="tab-info" class="tab-pane active" style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="background: var(--bg); padding: 12px; border-radius: 8px; border: 1px solid var(--line);">
+                        <p id="word-count" style="font-size: 0.85rem; margin: 0 0 4px; font-weight: bold; color: var(--accent);">字数：0</p>
+                        <p id="chapter-status" class="text-muted" style="font-size: 0.8rem; margin: 0;">状态：加载中</p>
+                    </div>
                 </div>
-            </div>
-            
-            <!-- Comments Tab (Placeholder) -->
-            <div id="tab-comments" class="tab-pane" style="display: none;">
-                <p class="text-muted" style="font-size: 0.85rem; text-align: center; margin-top: 2rem;">暂无吐槽。<br>读者划线评论将在这里显示。</p>
-            </div>
-            
-            <!-- Quotes Tab (Placeholder) -->
-            <div id="tab-quotes" class="tab-pane" style="display: none;">
-                <p class="text-muted" style="font-size: 0.85rem; text-align: center; margin-top: 2rem;">当前工作区的人物、世界观设定<br>可在这里搜索拖曳引用。</p>
+                
+                <!-- Comments Tab (Placeholder) -->
+                <div id="tab-comments" class="tab-pane" style="display: none;">
+                    <p class="text-muted" style="font-size: 0.85rem; text-align: center; margin-top: 2rem;">暂无吐槽。<br>读者划线评论将在这里显示。</p>
+                </div>
+                
+                <!-- Quotes Tab (Placeholder) -->
+                <div id="tab-quotes" class="tab-pane" style="display: none;">
+                    <p class="text-muted" style="font-size: 0.85rem; text-align: center; margin-top: 2rem;">当前工作区的人物、世界观设定<br>可在这里搜索拖曳引用。</p>
+                </div>
             </div>
         </div>
     </aside>
@@ -114,5 +146,5 @@
     </div>
 </dialog>
 
-<link rel="stylesheet" href="{% static 'css/editor.css' %}">
-<script src="{% static 'js/editor.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/editor.css' %}?v={% now 'U' %}">
+<script src="{% static 'js/editor.js' %}?v={% now 'U' %}"></script>

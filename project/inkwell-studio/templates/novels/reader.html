@@ -49,7 +49,7 @@
     <!-- Reading Area -->
     <article class="reader-content centered-content">
         {% if chapter %}
-        <div class="chapter-html" data-reader-chapter>{{ chapter.content_html|safe }}</div>
+        <div class="chapter-html" data-reader-chapter>{{ chapter_rendered_html|default:chapter.content_html|safe }}</div>
 
         <div class="reader-nav">
             {% if prev_chapter_id %}
@@ -354,7 +354,7 @@ body.dark-mode .reader-controls .icon-btn:hover { background: rgba(255,255,255,0
 
 .reader-content p {
     margin-bottom: 1.8em;
-    text-indent: 2em; /* Chinese convention */
+    text-indent: 0;
 }
 
 /* Custom Markdown tags styling */
@@ -442,6 +442,18 @@ body.dark-mode .mk-jitter { color: #f56565; }
 
 ruby { font-size: 1.1em; ruby-position: over; }
 rt { font-size: 0.6em; color: var(--r-muted); font-weight: 500; }
+
+.mk-align-left {
+    text-align: left;
+}
+
+.mk-align-center {
+    text-align: center;
+}
+
+.mk-align-right {
+    text-align: right;
+}
 
 .spoiler-block {
     margin: 2em 0;

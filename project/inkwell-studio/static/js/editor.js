@@ -1,6 +1,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     const editor = document.getElementById('main-editor-area');
+    const titleInput = document.getElementById('chapter-title-input');
     if (!editor) {
         return;
     }
@@ -13,6 +14,74 @@ document.addEventListener('DOMContentLoaded', () => {
     editor.addEventListener('input', resizeEditor);
     // Initial resize map slightly later to ensure rendering is complete
     setTimeout(resizeEditor, 10);
+
+    const historyStack = [];
+    let historyIndex = -1;
+    let isApplyingHistory = false;
+    let historyDebounceTimer = null;
+
+    const snapshotState = () => ({
+        title: titleInput ? titleInput.value : '',
+        content: editor.value,
+        start: editor.selectionStart,
+        end: editor.selectionEnd,
+    });
+
+    const applySnapshot = (state) => {
+        if (!state) return;
+        isApplyingHistory = true;
+        if (titleInput) titleInput.value = state.title;
+        editor.value = state.content;
+        editor.selectionStart = state.start;
+        editor.selectionEnd = state.end;
+        resizeEditor();
+        updateWordCount();
+        isApplyingHistory = false;
+    };
+
+    const recordHistory = (force = false) => {
+        if (isApplyingHistory) return;
+        const nextState = snapshotState();
+        const prevState = historyStack[historyIndex];
+        const unchanged = prevState
+            && prevState.title === nextState.title
+            && prevState.content === nextState.content
+            && prevState.start === nextState.start
+            && prevState.end === nextState.end;
+
+        if (unchanged && !force) return;
+
+        if (historyIndex < historyStack.length - 1) {
+            historyStack.splice(historyIndex + 1);
+        }
+
+        historyStack.push(nextState);
+        historyIndex = historyStack.length - 1;
+
+        if (historyStack.length > 200) {
+            historyStack.shift();
+            historyIndex -= 1;
+        }
+    };
+
+    const scheduleHistoryRecord = () => {
+        if (historyDebounceTimer) {
+            clearTimeout(historyDebounceTimer);
+        }
+        historyDebounceTimer = setTimeout(() => recordHistory(false), 180);
+    };
+
+    const undoHistory = () => {
+        if (historyIndex <= 0) return;
+        historyIndex -= 1;
+        applySnapshot(historyStack[historyIndex]);
+    };
+
+    const redoHistory = () => {
+        if (historyIndex >= historyStack.length - 1) return;
+        historyIndex += 1;
+        applySnapshot(historyStack[historyIndex]);
+    };
 
     // Generic formatting wrapping logic for Markdown tags
     const insertTag = (startTag, endTag) => {
@@ -32,6 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         editor.focus();
         resizeEditor();
+        recordHistory(true);
+        scheduleLivePreview();
     };
 
     // Generic logic specifically for block prefixes like H1 (# ), Lists (- )
@@ -51,17 +122,117 @@ document.addEventListener('DOMContentLoaded', () => {
         editor.selectionEnd = end + prefix.length;
         editor.focus();
         resizeEditor();
+        recordHistory(true);
+        scheduleLivePreview();
+    };
+
+    const insertTemplate = (template, cursorOffset) => {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const text = editor.value;
+        editor.value = text.substring(0, start) + template + text.substring(end);
+
+        const offset = Number.isFinite(cursorOffset) ? cursorOffset : template.length;
+        const nextPos = start + Math.max(0, Math.min(offset, template.length));
+        editor.selectionStart = nextPos;
+        editor.selectionEnd = nextPos;
+        editor.focus();
+        resizeEditor();
+        recordHistory(true);
+        scheduleLivePreview();
+    };
+
+    const insertLinkTemplate = () => {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const text = editor.value;
+        const selected = text.substring(start, end);
+        const label = selected || '链接文字';
+        const template = `[${label}](https://example.com)`;
+
+        editor.value = text.substring(0, start) + template + text.substring(end);
+
+        const urlStart = start + `[${label}](`.length;
+        const urlEnd = urlStart + 'https://example.com'.length;
+        editor.selectionStart = urlStart;
+        editor.selectionEnd = urlEnd;
+        editor.focus();
+        resizeEditor();
+        recordHistory(true);
+        scheduleLivePreview(); // Schedule live preview after link insertion
+    };
+
+    const imageUploadInput = document.getElementById('inline-image-input');
+    const insertImageMarkdown = (file) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            const text = editor.value;
+            const alt = file.name.replace(/\.[^.]+$/, '') || '图片';
+            const markdownImage = `![${alt}](${reader.result})`;
+
+            editor.value = text.substring(0, start) + markdownImage + text.substring(end);
+            const nextPos = start + markdownImage.length;
+            editor.selectionStart = nextPos;
+            editor.selectionEnd = nextPos;
+            editor.focus();
+            resizeEditor();
+            recordHistory(true);
+            scheduleLivePreview();
+        };
+        reader.readAsDataURL(file);
+    };
+
+    if (imageUploadInput) {
+        imageUploadInput.addEventListener('change', (event) => {
+            const file = event.target.files && event.target.files[0];
+            if (file) {
+                insertImageMarkdown(file);
+            }
+            imageUploadInput.value = '';
+        });
+    }
+
+    const insertRubyTemplate = () => {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const text = editor.value;
+        const selectedText = text.substring(start, end);
+
+        const baseText = (selectedText || '文字').replaceAll('|', '｜');
+        const rubyTemplate = `{注音|${baseText}|}`;
+
+        editor.value = text.substring(0, start) + rubyTemplate + text.substring(end);
+
+        // Place caret in the ruby reading segment after the second pipe.
+        const rubyInputPos = start + `{注音|${baseText}|`.length;
+        editor.selectionStart = rubyInputPos;
+        editor.selectionEnd = rubyInputPos;
+        editor.focus();
+        resizeEditor();
+        recordHistory(true);
+        scheduleLivePreview();
     };
 
     // Auto script binder for ALL toolbar buttons driven by pure data attributes!
     document.querySelectorAll('.tool-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
-            const { start, end, prefix } = btn.dataset;
+            const { start, end, prefix, template, cursorOffset, ruby, action } = btn.dataset;
             if (start !== undefined && end !== undefined) {
                 insertTag(start, end);
             } else if (prefix !== undefined) {
                 insertPrefix(prefix);
+            } else if (template !== undefined) {
+                insertTemplate(template, parseInt(cursorOffset || `${template.length}`, 10));
+            } else if (ruby !== undefined) {
+                insertRubyTemplate();
+            } else if (action === 'insert-link') {
+                insertLinkTemplate();
+            } else if (action === 'upload-image') {
+                if (imageUploadInput) imageUploadInput.click();
             }
         });
     });
@@ -72,10 +243,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === 'b' || e.key === 'B') {
                 e.preventDefault();
                 insertTag('**', '**');
+                return;
             }
             if (e.key === 'i' || e.key === 'I') {
                 e.preventDefault();
                 insertTag('*', '*');
+                return;
+            }
+            if ((e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
+                e.preventDefault();
+                undoHistory();
+                return;
+            }
+            if (e.key === 'y' || e.key === 'Y' || ((e.key === 'z' || e.key === 'Z') && e.shiftKey)) {
+                e.preventDefault();
+                redoHistory();
             }
         }
     });
@@ -88,6 +270,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    editor.addEventListener('input', scheduleHistoryRecord);
+    editor.addEventListener('input', scheduleLivePreview);
+    if (titleInput) {
+        titleInput.addEventListener('input', scheduleHistoryRecord);
+        titleInput.addEventListener('input', scheduleLivePreview);
+    }
+
     // Custom Font Logic
     const fontSelector = document.getElementById('font-selector');
     const uploadFontBtn = document.getElementById('upload-font-btn');
@@ -96,12 +285,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const fontUploadMsg = document.getElementById('font-upload-msg');
 
     // Editor data implementation
-    const titleInput = document.getElementById('chapter-title-input');
     const wordCount = document.getElementById('word-count');
     const saveStatus = document.getElementById('save-status');
     const btnSave = document.getElementById('btn-save');
     const btnPreview = document.getElementById('btn-preview');
     const workspaceLabel = document.getElementById('editor-workspace-label');
+    const btnToggleChapters = document.getElementById('btn-toggle-chapters');
+    const btnToggleLivePreview = document.getElementById('btn-toggle-live-preview');
     const breadcrumb = document.getElementById('editor-breadcrumb');
     const btnBackWorkspace = document.getElementById('btn-back-workspace');
     const btnToggleWorkspaceNav = document.getElementById('btn-toggle-workspace-nav');
@@ -110,6 +300,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const chapterStatus = document.getElementById('chapter-status');
     const workspaceShell = document.getElementById('workspace-shell');
     const workspaceSidebar = document.getElementById('workspace-sidebar');
+    const editorWorkspace = document.querySelector('.editor-workspace');
+    const editorCanvas = document.getElementById('editor-canvas');
+    const livePreviewPane = document.getElementById('editor-live-preview');
+    const livePreviewBody = document.getElementById('editor-live-preview-body');
 
     const resolveWorkspaceContext = () => {
         const params = new URLSearchParams(window.location.search);
@@ -133,6 +327,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentNovelId = workspaceContext.id;
     let isSaving = false;
 
+    recordHistory(true);
+
     if (workspaceLabel) {
         workspaceLabel.textContent = `${workspaceContext.title} #${currentNovelId || '?'}`;
     }
@@ -153,6 +349,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnToggleSide && editorRightPanel) {
         btnToggleSide.addEventListener('click', () => {
             editorRightPanel.classList.toggle('collapsed');
+            const collapsed = editorRightPanel.classList.contains('collapsed');
+            btnToggleSide.title = collapsed ? '展开辅助面板' : '收起辅助面板';
+            btnToggleSide.textContent = collapsed ? '◀' : '▶';
+        });
+    }
+
+    if (btnToggleChapters && editorWorkspace) {
+        btnToggleChapters.addEventListener('click', () => {
+            editorWorkspace.classList.toggle('is-chapters-collapsed');
+            const collapsed = editorWorkspace.classList.contains('is-chapters-collapsed');
+            btnToggleChapters.title = collapsed ? '展开章节栏' : '折叠章节栏';
+            btnToggleChapters.textContent = collapsed ? '▶' : '◀';
         });
     }
 
@@ -161,6 +369,16 @@ document.addEventListener('DOMContentLoaded', () => {
             workspaceShell.classList.toggle('is-workspace-sidebar-collapsed');
             const collapsed = workspaceShell.classList.contains('is-workspace-sidebar-collapsed');
             btnToggleWorkspaceNav.title = collapsed ? '展开工作区导航' : '折叠工作区导航';
+            btnToggleWorkspaceNav.textContent = collapsed ? '▶' : '◀';
+        });
+    }
+
+    if (btnToggleLivePreview && editorCanvas && livePreviewPane) {
+        btnToggleLivePreview.addEventListener('click', () => {
+            editorCanvas.classList.toggle('preview-hidden');
+            const hidden = editorCanvas.classList.contains('preview-hidden');
+            btnToggleLivePreview.title = hidden ? '显示实时预览' : '隐藏实时预览';
+            btnToggleLivePreview.textContent = hidden ? '◀' : '▶';
         });
     }
 
@@ -177,10 +395,78 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const checkAuth = () => localStorage.getItem("bedrock_access");
 
+    let previewDebounceTimer = null;
+
+    const renderLivePreview = async () => {
+        if (!livePreviewBody) {
+            return;
+        }
+
+        const token = checkAuth();
+        if (!token) {
+            livePreviewBody.innerHTML = '<p class="text-muted">请先登录后使用实时预览。</p>';
+            return;
+        }
+
+        const payload = {
+            content_md: editor.value || '',
+            novel: currentNovelId || null,
+        };
+
+        try {
+            const response = await fetch('/api/chapters/render_preview/', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+                livePreviewBody.innerHTML = '<p class="text-muted">预览渲染失败，请稍后重试。</p>';
+                return;
+            }
+
+            const data = await response.json();
+            livePreviewBody.innerHTML = data.html || '<p class="text-muted">暂无内容</p>';
+
+            livePreviewBody.querySelectorAll('.mk-custom-font[data-font]').forEach((el) => {
+                const fontName = (el.getAttribute('data-font') || '').trim();
+                if (fontName) {
+                    el.style.fontFamily = `"${fontName}", sans-serif`;
+                }
+            });
+        } catch (error) {
+            livePreviewBody.innerHTML = '<p class="text-muted">预览服务不可用。</p>';
+        }
+    };
+
+    function scheduleLivePreview() {
+        if (previewDebounceTimer) {
+            clearTimeout(previewDebounceTimer);
+        }
+        previewDebounceTimer = setTimeout(() => {
+            renderLivePreview();
+        }, 160);
+    }
+
     const loadChapterList = async (novelId) => {
         const token = checkAuth();
-        if (!token || !novelId) return;
         const container = document.getElementById('chapter-list-container');
+        if (!container) return;
+
+        if (!novelId) {
+            container.innerHTML = '<p class="text-muted" style="text-align:center; font-size: 0.85rem;">未指定工作区</p>';
+            return;
+        }
+
+        if (!token) {
+            container.innerHTML = '<p class="text-muted" style="text-align:center; font-size: 0.85rem;">请先登录后加载章节</p>';
+            return;
+        }
+
+        container.innerHTML = '<p class="text-muted" style="text-align:center; font-size: 0.85rem;">加载中...</p>';
         try {
             const res = await fetch(`/api/chapters/?novel=${novelId}`, { headers: { 'Authorization': `Bearer ${token}` } });
             if (res.ok) {
@@ -204,6 +490,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                     });
                 }
+            } else {
+                container.innerHTML = '<p class="text-danger" style="text-align:center; font-size: 0.85rem;">章节加载失败</p>';
             }
         } catch (e) {
             container.innerHTML = '<p class="text-danger">加载失败</p>';
@@ -219,7 +507,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadChapter = async () => {
         const token = checkAuth();
-        if (!token) return;
+        if (!token) {
+            if (breadcrumb) breadcrumb.textContent = '请先登录';
+            if (chapterStatus) chapterStatus.textContent = '状态：请先登录';
+            loadChapterList(currentNovelId);
+            return;
+        }
         
         try {
             if (currentChapterId) {
@@ -233,13 +526,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (chapterStatus) chapterStatus.textContent = `状态：${data.is_published ? '已发布' : '草稿'}`;
                     resizeEditor();
                     updateWordCount();
+                    recordHistory(true);
+                    scheduleLivePreview();
                     loadChapterList(currentNovelId);
+                } else {
+                    if (breadcrumb) breadcrumb.textContent = '章节加载失败';
+                    if (chapterStatus) chapterStatus.textContent = '状态：加载失败';
                 }
             } else if (currentNovelId) {
                 // If no chapter_id is provided, still load workspace chapter list.
                 if (breadcrumb) breadcrumb.textContent = `工作区 #${currentNovelId} / 新章节`;
                 if (chapterStatus) chapterStatus.textContent = '状态：草稿';
                 loadChapterList(currentNovelId);
+                recordHistory(true);
+                scheduleLivePreview();
             } else {
                 if (breadcrumb) breadcrumb.textContent = `未指定工作区`;
                 if (chapterStatus) chapterStatus.textContent = '状态：未指定工作区';
@@ -247,10 +547,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (container) {
                     container.innerHTML = '<p class="text-muted" style="text-align:center; font-size: 0.85rem;">未指定工作区</p>';
                 }
+                recordHistory(true);
+                scheduleLivePreview();
             }
         } catch (err) {
             console.error(err);
             if (chapterStatus) chapterStatus.textContent = '状态：加载失败';
+            if (breadcrumb) breadcrumb.textContent = '加载失败';
+            loadChapterList(currentNovelId);
         }
     };
 

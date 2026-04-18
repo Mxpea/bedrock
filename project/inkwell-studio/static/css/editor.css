@@ -9,6 +9,17 @@
     position: relative;
 }
 
+.editor-workspace.is-chapters-collapsed .editor-left-panel {
+    width: 42px;
+    min-width: 0;
+    border-right: none;
+    overflow: hidden;
+}
+
+.editor-workspace.is-chapters-collapsed .editor-left-panel .editor-panel-body {
+    display: none;
+}
+
 .editor-left-panel {
     width: 240px;
     background: var(--bg-soft);
@@ -17,6 +28,28 @@
     flex-direction: column;
     z-index: 10;
     transition: width 0.3s ease;
+}
+
+.editor-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+}
+
+.panel-head-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.editor-panel-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
 }
 
 .chapter-fold {
@@ -83,7 +116,28 @@
     display: flex;
     flex-direction: column;
     min-width: 400px;
+    min-height: 0;
     background: var(--bg);
+}
+
+.editor-scroll-area {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 120px;
+}
+
+.editor-canvas {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 38%);
+    gap: 18px;
+    max-width: 1220px;
+    margin: 0 auto;
+    padding: 0 18px;
+}
+
+.editor-canvas.preview-hidden {
+    grid-template-columns: minmax(0, 1fr) 42px;
 }
 
 .editor-preview-pane {
@@ -112,9 +166,13 @@
     transition: width 0.3s ease;
 }
 .editor-side-panel.collapsed {
-    width: 0;
+    width: 42px;
     border-left: none;
     overflow: hidden;
+}
+
+.editor-side-panel.collapsed .editor-panel-body {
+    display: none;
 }
 
 .panel-tabs {
@@ -145,6 +203,80 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+.layout-toggle-btn.compact {
+    min-width: 0;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    line-height: 1;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.editor-panel-head .icon-btn.small {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+}
+
+.editor-workspace.is-chapters-collapsed .editor-left-panel .editor-panel-head {
+    justify-content: center;
+    padding: 6px;
+    border-bottom: none;
+}
+
+.editor-workspace.is-chapters-collapsed .editor-left-panel .editor-panel-head .eyebrow,
+.editor-workspace.is-chapters-collapsed .editor-left-panel .panel-head-actions #btn-new-chapter {
+    display: none;
+}
+
+.editor-workspace.is-chapters-collapsed .editor-left-panel .panel-head-actions {
+    width: 100%;
+    justify-content: center;
+}
+
+.editor-workspace.is-chapters-collapsed .editor-left-panel .panel-head-actions #btn-toggle-chapters {
+    width: 32px;
+    height: 32px;
+}
+
+.editor-side-panel.collapsed .editor-panel-head {
+    justify-content: center;
+    padding: 6px;
+    border-bottom: none;
+}
+
+.editor-side-panel.collapsed .editor-panel-head .eyebrow {
+    display: none;
+}
+
+.editor-side-panel.collapsed .editor-panel-head #btn-toggle-side {
+    width: 32px;
+    height: 32px;
+}
+
+.editor-canvas.preview-hidden .editor-live-preview-head {
+    justify-content: center;
+    padding: 6px;
+}
+
+.editor-canvas.preview-hidden .editor-live-preview-head > span {
+    display: none;
+}
+
+.editor-canvas.preview-hidden .editor-live-preview-head #btn-toggle-live-preview {
+    width: 32px;
+    height: 32px;
 }
 
 .db-item {
@@ -192,6 +324,29 @@ body.dark-mode .chapter-item.active {
     transition: background 0.4s ease;
 }
 
+.layout-toggle-btn {
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--accent-strong);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.layout-toggle-btn:hover {
+    transform: translateY(-1px);
+    background: rgba(22, 50, 79, 0.06);
+    border-color: rgba(22, 50, 79, 0.22);
+}
+
+body.dark-mode .layout-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
 .tool-group {
     display: flex;
     align-items: center;
@@ -237,14 +392,65 @@ body.dark-mode .tool-btn.syntax-custom { background: rgba(255,255,255,0.04); bor
 .status-msg { font-size: 0.85rem; color: var(--muted); }
 
 .editor-body {
-    flex: 1;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     padding: 32px 0 64px;
-    max-width: 800px;
-    margin: 0 auto;
+    max-width: 100%;
+    margin: 0;
     width: 100%;
 }
+
+.editor-live-preview {
+    position: sticky;
+    top: 10px;
+    align-self: start;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--bg-soft);
+    min-height: 60vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.editor-canvas.preview-hidden .editor-live-preview-body {
+    display: none;
+}
+
+.editor-live-preview-head {
+    padding: 10px 14px;
+    font-weight: 700;
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.editor-live-preview-body {
+    padding: 18px;
+    line-height: 1.8;
+    font-size: 1rem;
+}
+
+.editor-live-preview-body p {
+    margin: 0 0 1em;
+}
+
+.editor-live-preview-body .mk-align-left { text-align: left; }
+.editor-live-preview-body .mk-align-center { text-align: center; }
+.editor-live-preview-body .mk-align-right { text-align: right; }
+
+.editor-live-preview-body img {
+    max-width: 100%;
+    border-radius: 8px;
+    display: block;
+}
+
+.editor-live-preview-body ruby { font-size: 1.05em; ruby-position: over; }
+.editor-live-preview-body rt { font-size: 0.62em; color: var(--muted); }
 
 .chapter-title-input {
     border: none;
@@ -261,7 +467,8 @@ body.dark-mode .tool-btn.syntax-custom { background: rgba(255,255,255,0.04); bor
 body.dark-mode .chapter-title-input::placeholder { color: rgba(255, 255, 255, 0.2); }
 
 .chapter-content-input {
-    flex: 1;
+    flex: 0 0 auto;
+    width: 100%;
     min-height: 50vh; /* Make sure there gets some room to type */
     border: none;
     outline: none;
@@ -330,5 +537,15 @@ body.dark-mode .chapter-content-input::placeholder { color: rgba(255, 255, 255, 
 
     .editor-left-panel {
         width: 180px;
+    }
+
+    .editor-canvas,
+    .editor-canvas.preview-hidden {
+        grid-template-columns: 1fr;
+    }
+
+    .editor-live-preview {
+        position: static;
+        min-height: 32vh;
     }
 }

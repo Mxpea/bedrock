@@ -12,6 +12,7 @@
             <span class="breadcrumb" id="editor-breadcrumb">加载中...</span>
         </div>
         <div class="header-right">
+            <button class="icon-btn" id="btn-toggle-left-panel" title="收起章节栏" aria-label="收起章节栏"><i class="ph ph-sidebar-simple"></i></button>
             <span class="status-msg text-muted" id="save-status"></span>
             <button class="button secondary small" id="btn-preview">阅读预览</button>
             <button class="button primary small" id="btn-save">保存</button>
@@ -72,6 +73,10 @@
 
         <!-- 3. 右侧：可收缩侧边栏 (Context) -->
         <aside class="editor-side-panel" id="editor-right-panel">
+            <div class="panel-header-row" style="padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line);">
+                <span class="eyebrow" style="margin: 0; font-size: 0.85rem;">辅助面板</span>
+                <button class="icon-btn small" id="btn-toggle-right-panel" title="收起辅助面板" aria-label="收起辅助面板" style="font-size: 1rem;">▶</button>
+            </div>
             <div class="panel-tabs">
                 <button class="tab-btn active" data-target="tab-info" title="章节信息">ℹ️ 信息</button>
                 <button class="tab-btn" data-target="tab-comments" title="本章吐槽">💬 吐槽</button>
@@ -225,8 +230,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnPreview = document.getElementById('btn-preview');
     const breadcrumb = document.getElementById('editor-breadcrumb');
     const btnBackWorkspace = document.getElementById('btn-back-workspace');
+    const btnToggleLeftPanel = document.getElementById('btn-toggle-left-panel');
+    const btnToggleRightPanel = document.getElementById('btn-toggle-right-panel');
     const btnToggleSide = document.getElementById('btn-toggle-side');
+    const editorWorkspace = document.querySelector('.editor-workspace');
     const editorRightPanel = document.getElementById('editor-right-panel');
+    const editorLeftPanel = document.querySelector('.editor-left-panel');
     const chapterStatus = document.getElementById('chapter-status');
     
     let currentChapterId = new URLSearchParams(window.location.search).get('chapter_id');
@@ -245,16 +254,46 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Right Sidebar toggle logic
-    btnToggleSide.addEventListener('click', () => {
-        if (editorRightPanel.style.display === 'none' || editorRightPanel.classList.contains('collapsed')) {
-            editorRightPanel.classList.remove('collapsed');
-            editorRightPanel.style.display = '';
-        } else {
-            editorRightPanel.classList.add('collapsed');
-            editorRightPanel.style.display = 'none';
+    const syncPanelToggleTitles = () => {
+        if (editorWorkspace && btnToggleLeftPanel) {
+            const leftCollapsed = editorWorkspace.classList.contains('is-left-collapsed');
+            btnToggleLeftPanel.title = leftCollapsed ? '展开章节栏' : '收起章节栏';
+            btnToggleLeftPanel.setAttribute('aria-label', leftCollapsed ? '展开章节栏' : '收起章节栏');
         }
-    });
+        if (editorWorkspace && btnToggleRightPanel) {
+            const rightCollapsed = editorWorkspace.classList.contains('is-right-collapsed');
+            btnToggleRightPanel.title = rightCollapsed ? '展开辅助面板' : '收起辅助面板';
+            btnToggleRightPanel.textContent = rightCollapsed ? '◀' : '▶';
+        }
+        if (btnToggleSide) {
+            const rightCollapsed = editorWorkspace && editorWorkspace.classList.contains('is-right-collapsed');
+            btnToggleSide.title = rightCollapsed ? '展开辅助面板' : '收起辅助面板';
+        }
+    };
+
+    if (btnToggleLeftPanel && editorWorkspace && editorLeftPanel) {
+        btnToggleLeftPanel.addEventListener('click', () => {
+            editorWorkspace.classList.toggle('is-left-collapsed');
+            syncPanelToggleTitles();
+        });
+    }
+
+    if (btnToggleRightPanel && editorWorkspace && editorRightPanel) {
+        btnToggleRightPanel.addEventListener('click', () => {
+            editorWorkspace.classList.toggle('is-right-collapsed');
+            syncPanelToggleTitles();
+        });
+    }
+
+    // Right Sidebar toggle logic
+    if (btnToggleSide && editorWorkspace && editorRightPanel) {
+        btnToggleSide.addEventListener('click', () => {
+            editorWorkspace.classList.toggle('is-right-collapsed');
+            syncPanelToggleTitles();
+        });
+    }
+
+    syncPanelToggleTitles();
 
     if (currentNovelId) {
         btnBackWorkspace.href = `/workspace/${currentNovelId}/writing/`;
@@ -271,8 +310,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadChapterList = async (novelId) => {
         const token = checkAuth();
-        if (!token || !novelId) return;
         const container = document.getElementById('chapter-list-container');
+        if (!container) return;
+
+        if (!novelId) {
+            container.innerHTML = '<p class="text-muted" style="text-align:center; font-size: 0.85rem;">未指定工作区</p>';
+            return;
+        }
+
+        if (!token) {
+            container.innerHTML = '<p class="text-muted" style="text-align:center; font-size: 0.85rem;">请先登录后加载章节</p>';
+            return;
+        }
+
+        container.innerHTML = '<p class="text-muted" style="text-align:center; font-size: 0.85rem;">加载中...</p>';
         try {
             const res = await fetch(`/api/chapters/?novel=${novelId}`, { headers: { 'Authorization': `Bearer ${token}` } });
             if (res.ok) {
@@ -288,6 +339,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>`
                     ).join('');
                 }
+            } else {
+                container.innerHTML = '<p class="text-danger" style="text-align:center; font-size: 0.85rem;">章节加载失败</p>';
             }
         } catch (e) {
             container.innerHTML = '<p class="text-danger">加载失败</p>';
@@ -301,7 +354,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadChapter = async () => {
         const token = checkAuth();
-        if (!token) return;
+        if (!token) {
+            if (breadcrumb) breadcrumb.textContent = '请先登录';
+            if (chapterStatus) chapterStatus.textContent = '状态：请先登录';
+            loadChapterList(currentNovelId);
+            return;
+        }
         
         try {
             if (currentChapterId) {
@@ -316,16 +374,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     resizeEditor();
                     updateWordCount();
                     loadChapterList(currentNovelId);
+                } else {
+                    if (breadcrumb) breadcrumb.textContent = '章节加载失败';
+                    if (chapterStatus) chapterStatus.textContent = '状态：加载失败';
                 }
             } else if (currentNovelId) {
                 // If only workspace_id is provided, try to create a new chapter
                 breadcrumb.textContent = `工作区 #${currentNovelId} / 新章节`;
+                if (chapterStatus) chapterStatus.textContent = '状态：草稿';
                 loadChapterList(currentNovelId);
             } else {
                 breadcrumb.textContent = `未指定工作区`;
+                if (chapterStatus) chapterStatus.textContent = '状态：未指定工作区';
+                loadChapterList(null);
             }
         } catch (err) {
             console.error(err);
+            if (breadcrumb) breadcrumb.textContent = '加载失败';
+            if (chapterStatus) chapterStatus.textContent = '状态：加载失败';
+            loadChapterList(currentNovelId);
         }
     };
 
@@ -546,6 +613,20 @@ document.addEventListener('DOMContentLoaded', () => {
     flex: 1;
     overflow: hidden;
     position: relative;
+}
+
+.editor-workspace.is-left-collapsed .editor-left-panel {
+    width: 0;
+    min-width: 0;
+    border-right: none;
+    overflow: hidden;
+}
+
+.editor-workspace.is-right-collapsed .editor-side-panel {
+    width: 0;
+    min-width: 0;
+    border-left: none;
+    overflow: hidden;
 }
 
 .editor-left-panel {
