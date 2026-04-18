@@ -190,7 +190,7 @@ class ChapterViewSet(viewsets.ModelViewSet):
             return Response({"detail": "图片大小不能超过 10MB"}, status=status.HTTP_400_BAD_REQUEST)
 
         ext = os.path.splitext(image_file.name)[1].lower()
-        if ext not in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}:
+        if ext not in {".png", ".jpg", ".jpeg", ".gif", ".webp"}:
             return Response({"detail": "不支持的图片格式"}, status=status.HTTP_400_BAD_REQUEST)
 
         safe_stem = slugify(os.path.splitext(image_file.name)[0]) or "image"
@@ -236,8 +236,14 @@ class CharacterViewSet(viewsets.ModelViewSet):
         if starred in {"1", "true", "yes"}:
             queryset = queryset.filter(is_starred=True)
 
+        ALLOWED_ORDERINGS = {
+            "sort_order", "-sort_order",
+            "created_at", "-created_at",
+            "updated_at", "-updated_at",
+            "name", "-name",
+        }
         ordering = (self.request.GET.get("ordering") or "").strip()
-        if ordering:
+        if ordering and ordering in ALLOWED_ORDERINGS:
             return queryset.order_by(ordering)
 
         return queryset.order_by("-is_pinned", "sort_order", "id")
@@ -265,9 +271,12 @@ class CharacterViewSet(viewsets.ModelViewSet):
         if not isinstance(ids, list):
             return Response({"detail": "ids 必须为数组"}, status=status.HTTP_400_BAD_REQUEST)
 
+        from django.utils import timezone as tz
+
         items = list(self.get_queryset().filter(id__in=ids))
         mapping = {item.pk: item for item in items}
 
+        now = tz.now()
         update_items = []
         for idx, raw_id in enumerate(ids):
             try:
@@ -278,6 +287,7 @@ class CharacterViewSet(viewsets.ModelViewSet):
             if not obj:
                 continue
             obj.sort_order = idx
+            obj.updated_at = now
             update_items.append(obj)
 
         if update_items:

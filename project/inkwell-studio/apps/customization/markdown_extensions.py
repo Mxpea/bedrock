@@ -60,7 +60,7 @@ ALLOWED_MARKDOWN_ATTRS = {
     "*": ["class", "id", "title", "data-font"],
 }
 
-ALLOWED_PROTOCOLS = ["http", "https", "mailto", "data"]
+ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
 
 
 def _replace_font_token(match: re.Match) -> str:
