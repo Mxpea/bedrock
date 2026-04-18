@@ -37,6 +37,13 @@
     gap: 8px;
     padding: 12px 14px;
     border-bottom: 1px solid var(--line);
+    overflow: hidden;
+}
+
+.editor-panel-head .eyebrow {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .panel-head-actions {
@@ -207,8 +214,8 @@
 
 .layout-toggle-btn.compact {
     min-width: 0;
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
     padding: 0;
     line-height: 1;
     border-radius: 999px;
@@ -220,8 +227,8 @@
 }
 
 .editor-panel-head .icon-btn.small {
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
     padding: 0;
     display: inline-flex;
     align-items: center;
@@ -246,8 +253,8 @@
 }
 
 .editor-workspace.is-chapters-collapsed .editor-left-panel .panel-head-actions #btn-toggle-chapters {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
 }
 
 .editor-side-panel.collapsed .editor-panel-head {
@@ -261,8 +268,8 @@
 }
 
 .editor-side-panel.collapsed .editor-panel-head #btn-toggle-side {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
 }
 
 .editor-canvas.preview-hidden .editor-live-preview-head {
@@ -275,8 +282,8 @@
 }
 
 .editor-canvas.preview-hidden .editor-live-preview-head #btn-toggle-live-preview {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
 }
 
 .db-item {
@@ -351,8 +358,9 @@ body.dark-mode .layout-toggle-btn:hover {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: wrap; /* support overflowing toolbars securely */
+    flex-wrap: wrap;
 }
+
 .tool-group.right { gap: 12px; margin-left: auto; }
 
 .editor-context {
@@ -444,9 +452,50 @@ body.dark-mode .tool-btn.syntax-custom { background: rgba(255,255,255,0.04); bor
 .editor-live-preview-body .mk-align-right { text-align: right; }
 
 .editor-live-preview-body img {
-    max-width: 100%;
+    max-width: min(100%, calc(100vw - 64px));
+    height: auto;
+    width: auto;
     border-radius: 8px;
     display: block;
+    margin: 0.8em auto;
+}
+
+.editor-live-preview-body pre {
+    margin: 1em 0;
+    padding: 0.95em 1.05em;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    overflow-x: auto;
+    line-height: 1.65;
+    white-space: pre;
+    tab-size: 4;
+}
+
+.editor-live-preview-body code {
+    font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+    font-size: 0.9em;
+    word-break: normal;
+}
+
+.editor-live-preview-body p code,
+.editor-live-preview-body li code {
+    padding: 0.08em 0.35em;
+    border-radius: 6px;
+    background: rgba(22, 50, 79, 0.1);
+}
+
+.editor-live-preview-body del,
+.editor-live-preview-body s {
+    text-decoration-thickness: 1.5px;
+    opacity: 0.92;
+}
+
+.editor-live-preview-body pre code {
+    display: block;
+    background: transparent;
+    border: none;
+    padding: 0;
 }
 
 .editor-live-preview-body ruby { font-size: 1.05em; ruby-position: over; }

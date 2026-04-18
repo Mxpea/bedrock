@@ -17,6 +17,9 @@ TOKEN_PATTERNS = {
     "align_left": re.compile(r"\{左对齐\|([\s\S]+?)\}"),
     "align_center": re.compile(r"\{居中\|([\s\S]+?)\}"),
     "align_right": re.compile(r"\{右对齐\|([\s\S]+?)\}"),
+    "strike": re.compile(r"~~([^\n]+?)~~"),
+    # Compatibility form: ~text~
+    "strike_single": re.compile(r"(?<!~)~([^~\n]+?)~(?!~)"),
 }
 
 ALLOWED_ADVANCED_TAGS = ["ruby", "rt", "span", "div", "i", "b", "br", "hr"]
@@ -32,6 +35,8 @@ ALLOWED_MARKDOWN_TAGS = [
     "pre",
     "strong",
     "em",
+    "del",
+    "s",
     "ul",
     "ol",
     "li",
@@ -90,13 +95,15 @@ def apply_safe_tokens(text: str) -> str:
     text = TOKEN_PATTERNS["align_left"].sub(r'<div class="mk-align-left">\1</div>', text)
     text = TOKEN_PATTERNS["align_center"].sub(r'<div class="mk-align-center">\1</div>', text)
     text = TOKEN_PATTERNS["align_right"].sub(r'<div class="mk-align-right">\1</div>', text)
+    text = TOKEN_PATTERNS["strike"].sub(r"<del>\1</del>", text)
+    text = TOKEN_PATTERNS["strike_single"].sub(r"<del>\1</del>", text)
     return text
 
 
 def _render_markdown(text: str) -> str:
     return markdown.markdown(
         text,
-        extensions=["extra", "sane_lists", "nl2br"],
+        extensions=["extra", "fenced_code", "sane_lists", "nl2br"],
         output_format="html5",
     )
 

@@ -278,6 +278,54 @@ body.dark-mode .float-btn {
     white-space: normal;
 }
 
+.chapter-html img {
+    max-width: min(100%, calc(100vw - 56px));
+    height: auto;
+    width: auto;
+    display: block;
+    margin: 0.9em auto;
+    border-radius: 10px;
+}
+
+.chapter-html pre {
+    margin: 1.1em 0;
+    padding: 0.95em 1.05em;
+    border-radius: 12px;
+    border: 1px solid var(--r-line);
+    background: color-mix(in srgb, var(--r-accent) 8%, transparent);
+    overflow-x: auto;
+    line-height: 1.65;
+    white-space: pre;
+    tab-size: 4;
+}
+
+.chapter-html code {
+    font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+    font-size: 0.9em;
+    word-break: normal;
+}
+
+.chapter-html pre code {
+    display: block;
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+.chapter-html p code,
+.chapter-html li code {
+    padding: 0.08em 0.38em;
+    border-radius: 6px;
+    border: 1px solid var(--r-line);
+    background: color-mix(in srgb, var(--r-accent) 10%, transparent);
+}
+
+.chapter-html del,
+.chapter-html s {
+    text-decoration-thickness: 1.5px;
+    opacity: 0.9;
+}
+
 .chapter-html br {
     line-height: 2.05;
 }

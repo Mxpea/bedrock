@@ -471,14 +471,15 @@ body.dark-mode .secondary {
 }
 
 .workspace-sidebar-head #btn-toggle-workspace-nav {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
     padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    pointer-events: auto;
 }
 
 .workspace-sidebar-body {

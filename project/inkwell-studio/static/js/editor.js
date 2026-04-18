@@ -163,33 +163,90 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const imageUploadInput = document.getElementById('inline-image-input');
-    const insertImageMarkdown = (file) => {
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-            const start = editor.selectionStart;
-            const end = editor.selectionEnd;
-            const text = editor.value;
-            const alt = file.name.replace(/\.[^.]+$/, '') || '图片';
-            const markdownImage = `![${alt}](${reader.result})`;
 
-            editor.value = text.substring(0, start) + markdownImage + text.substring(end);
-            const nextPos = start + markdownImage.length;
-            editor.selectionStart = nextPos;
-            editor.selectionEnd = nextPos;
-            editor.focus();
-            resizeEditor();
-            recordHistory(true);
-            scheduleLivePreview();
+    const uploadImageFile = async (file) => {
+        if (!file) {
+            throw new Error('未选择图片');
+        }
+
+        if (!currentNovelId) {
+            throw new Error('请先指定工作区');
+        }
+
+        const token = checkAuth();
+        if (!token) {
+            window.location.href = `/login/?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+            throw new Error('未登录');
+        }
+
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('novel', String(currentNovelId));
+
+        const requestInit = {
+            method: 'POST',
+            body: formData,
         };
-        reader.readAsDataURL(file);
+
+        let response;
+        if (typeof fetchWithAuthRetry === 'function') {
+            response = await fetchWithAuthRetry('/api/chapters/upload_image/', requestInit);
+        } else {
+            response = await fetch('/api/chapters/upload_image/', {
+                ...requestInit,
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+        }
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(data.detail || '图片上传失败');
+        }
+
+        if (!data.url) {
+            throw new Error('图片URL生成失败');
+        }
+
+        return data.url;
+    };
+
+    const insertImageMarkdown = async (file) => {
+        const imageUrl = await uploadImageFile(file);
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const text = editor.value;
+        const alt = file.name.replace(/\.[^.]+$/, '') || '图片';
+        const markdownImage = `![${alt}](${imageUrl})`;
+
+        editor.value = text.substring(0, start) + markdownImage + text.substring(end);
+        const nextPos = start + markdownImage.length;
+        editor.selectionStart = nextPos;
+        editor.selectionEnd = nextPos;
+        editor.focus();
+        resizeEditor();
+        recordHistory(true);
+        scheduleLivePreview();
     };
 
     if (imageUploadInput) {
-        imageUploadInput.addEventListener('change', (event) => {
+        imageUploadInput.addEventListener('change', async (event) => {
             const file = event.target.files && event.target.files[0];
             if (file) {
-                insertImageMarkdown(file);
+                try {
+                    if (saveStatus) {
+                        saveStatus.textContent = '图片上传中...';
+                    }
+                    await insertImageMarkdown(file);
+                    if (saveStatus) {
+                        saveStatus.textContent = '图片已插入';
+                    }
+                } catch (error) {
+                    if (saveStatus) {
+                        saveStatus.textContent = error.message || '图片上传失败';
+                    }
+                }
             }
             imageUploadInput.value = '';
         });

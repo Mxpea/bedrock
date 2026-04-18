@@ -1,6 +1,12 @@
-from rest_framework import permissions, viewsets
+import os
+import uuid
+
+from django.core.files.storage import default_storage
+from django.utils.text import slugify
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from django.db.models import Q
 
@@ -89,3 +95,43 @@ class ChapterViewSet(viewsets.ModelViewSet):
 
         rendered = sanitize_advanced_content(content_md) if use_advanced else sanitize_standard_content(content_md)
         return Response({"html": rendered})
+
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def upload_image(self, request):
+        novel_id = request.data.get("novel")
+        if not novel_id:
+            return Response({"detail": "缺少工作区ID"}, status=status.HTTP_400_BAD_REQUEST)
+
+        novel = Novel.objects.filter(id=novel_id, author=request.user, is_deleted=False).first()
+        if not novel:
+            return Response({"detail": "工作区不存在或无权访问"}, status=status.HTTP_404_NOT_FOUND)
+
+        image_file = request.FILES.get("image")
+        if not image_file:
+            return Response({"detail": "未上传图片文件"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not (image_file.content_type or "").startswith("image/"):
+            return Response({"detail": "仅支持图片文件"}, status=status.HTTP_400_BAD_REQUEST)
+
+        max_size = 10 * 1024 * 1024
+        if image_file.size > max_size:
+            return Response({"detail": "图片大小不能超过 10MB"}, status=status.HTTP_400_BAD_REQUEST)
+
+        ext = os.path.splitext(image_file.name)[1].lower()
+        if ext not in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}:
+            return Response({"detail": "不支持的图片格式"}, status=status.HTTP_400_BAD_REQUEST)
+
+        safe_stem = slugify(os.path.splitext(image_file.name)[0]) or "image"
+        safe_name = f"{safe_stem}-{uuid.uuid4().hex[:10]}{ext}"
+        workspace_segment = str(novel_id)
+        storage_path = (
+            f"workspace_assets/user_{request.user.id}/workspace_{workspace_segment}/images/{safe_name}"
+        )
+
+        stored_path = default_storage.save(storage_path, image_file)
+        return Response({"url": default_storage.url(stored_path), "path": stored_path}, status=status.HTTP_201_CREATED)
