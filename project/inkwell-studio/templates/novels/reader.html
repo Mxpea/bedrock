@@ -1,0 +1,544 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+{% if chapter %}阅读：{{ chapter.novel.title }} - {{ chapter.title }}{% else %}阅读器 - Bedrock{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="reader-shell fade-in">
+    <!-- Reader Topbar Area -->
+    <header class="reader-header immersive-header">
+        <div class="reader-info">
+            {% if chapter %}
+            <h1 style="font-size: 1.2rem; margin:0;">{{ chapter.title }}</h1>
+            <span class="meta" style="font-size: 0.85rem;">{{ chapter.novel.title }} • 第 {{ chapter.order }} 章</span>
+            {% else %}
+            <h1 style="font-size: 1.2rem; margin:0;">阅读器</h1>
+            <span class="meta" style="font-size: 0.85rem;">选择作品后开始阅读</span>
+            {% endif %}
+        </div>
+        <div class="reader-controls">
+            <button class="icon-btn theme-toggle" title="切换夜间模式">🌙</button>
+            <button class="icon-btn font-size" title="调整字号">AA</button>
+            {% if chapter %}
+            <button class="icon-btn" id="chapter-drawer-toggle" title="目录">≡</button>
+            {% endif %}
+        </div>
+    </header>
+
+    {% if chapter %}
+    <aside class="chapter-drawer" id="chapter-drawer" aria-hidden="true">
+        <h3>章节目录</h3>
+        <div class="chapter-drawer-list">
+            {% for c in chapter_list %}
+            <a href="/reader/{{ c.id }}/" class="chapter-drawer-item {% if c.id == chapter.id %}active{% endif %}">第 {{ c.order }} 章 · {{ c.title }}</a>
+            {% endfor %}
+        </div>
+    </aside>
+    {% endif %}
+
+    <!-- Floating Action Bar (Right side) -->
+    <aside class="reader-float-bar">
+        <button class="float-btn" title="划线模式开关 (开启后选中文字可批注)">📝</button>
+        <button class="float-btn" title="查看本章批注">💬</button>
+        <button class="float-btn" title="音效开关">🎵</button>
+        <button class="float-btn" title="书签">🔖</button>
+    </aside>
+
+    <!-- Reading Area -->
+    <article class="reader-content centered-content">
+        {% if chapter %}
+        <div class="chapter-html" data-reader-chapter>{{ chapter.content_html|safe }}</div>
+
+        <div class="reader-nav">
+            {% if prev_chapter_id %}
+            <a href="/reader/{{ prev_chapter_id }}/" class="nav-btn prev">← 上一章</a>
+            {% else %}
+            <span class="nav-btn disabled">← 上一章</span>
+            {% endif %}
+
+            <a href="/novels/" class="nav-btn index">≡ 返回作品列表</a>
+
+            {% if next_chapter_id %}
+            <a href="/reader/{{ next_chapter_id }}/" class="nav-btn next">下一章 →</a>
+            {% else %}
+            <span class="nav-btn disabled">下一章 →</span>
+            {% endif %}
+        </div>
+        {% else %}
+        <section class="reader-empty">
+            <h2>暂无可阅读章节</h2>
+            <p>没有找到可访问的已发布章节。你可以先去作品页创建并发布章节，或从公开作品进入阅读。</p>
+            <div class="reader-empty-actions">
+                <a class="nav-btn index" href="/novels/">前往作品列表</a>
+                <a class="nav-btn index" href="/editor/">进入编辑器</a>
+            </div>
+        </section>
+        {% endif %}
+    </article>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    // Transform custom syntax elements for per-character animations
+    const applyCharAnimations = (selector, type) => {
+        document.querySelectorAll(selector).forEach(el => {
+            const text = el.textContent;
+            el.innerHTML = '';
+            for (let i = 0; i < text.length; i++) {
+                const charSpan = document.createElement('span');
+                charSpan.textContent = text[i];
+                // For jitter: completely random negative delay
+                // For wobble: staggered negative delay to create a continuous wave
+                if (type === 'jitter') {
+                    charSpan.style.animationDelay = `-${Math.random() * 0.5}s`;
+                } else if (type === 'wobble') {
+                    charSpan.style.animationDelay = `-${i * 0.15}s`;
+                }
+                el.appendChild(charSpan);
+            }
+        });
+    };
+
+    applyCharAnimations('.mk-jitter', 'jitter');
+    applyCharAnimations('.mk-wobble', 'wobble');
+});
+</script>
+
+<style>
+/* Reader Layout overrides */
+.page-shell:has(.reader-shell) {
+    background: #fdfaf5; /* 专为阅读定制的暖色背景 */
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Light / Dark Mode Vars specific to Reader */
+.reader-shell {
+    --r-bg: #fdfaf5;
+    --r-text: #2a2c31;
+    --r-muted: #7c889a;
+    --r-line: rgba(42, 44, 49, 0.1);
+    --r-accent: #3d5a80;
+    font-family: inherit;
+}
+
+body.dark-mode .reader-shell {
+    --r-bg: #1a1b1e;
+    --r-text: #d0d4da;
+    --r-muted: #647082;
+    --r-line: rgba(255, 255, 255, 0.08);
+    --r-accent: #6b8fb7;
+    background: var(--r-bg);
+}
+
+.reader-shell {
+    background: var(--r-bg);
+    color: var(--r-text);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: background 0.4s ease, color 0.4s ease;
+    position: relative;
+}
+
+.immersive-header {
+    width: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    padding: 12px 32px;
+    background: rgba(253, 250, 245, 0.85); /* semi-transparent for light */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 100;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--r-line);
+    opacity: 0;
+    transform: translateY(-100%);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+body.dark-mode .immersive-header {
+    background: rgba(26, 27, 30, 0.85);
+}
+
+.reader-shell:hover .immersive-header {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Floating Action Bar */
+.reader-float-bar {
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    z-index: 90;
+}
+
+.float-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--r-bg);
+    border: 1px solid var(--r-line);
+    color: var(--r-text);
+    font-size: 1.25rem;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.float-btn:hover {
+    transform: translateX(-2px) scale(1.05);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+body.dark-mode .float-btn {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.centered-content {
+    width: 100%;
+    max-width: 700px;
+    padding: 100px 24px 120px;
+    margin: 0 auto;
+}
+
+.chapter-drawer {
+    position: fixed;
+    top: 64px;
+    right: 84px;
+    width: 320px;
+    max-height: 70vh;
+    overflow-y: auto;
+    background: var(--r-bg);
+    border: 1px solid var(--r-line);
+    border-radius: 12px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.12);
+    padding: 14px;
+    z-index: 120;
+    display: none;
+}
+
+.chapter-drawer.open {
+    display: block;
+}
+
+.chapter-drawer h3 {
+    margin: 0 0 10px;
+    font-size: 0.95rem;
+}
+
+.chapter-drawer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.chapter-drawer-item {
+    color: var(--r-text);
+    text-decoration: none;
+    padding: 8px 10px;
+    border-radius: 8px;
+}
+
+.chapter-drawer-item:hover {
+    background: rgba(42, 44, 49, 0.06);
+}
+
+.chapter-drawer-item.active {
+    background: var(--r-accent);
+    color: #fff;
+}
+
+.chapter-html {
+    line-height: 2.05;
+    white-space: normal;
+}
+
+.chapter-html br {
+    line-height: 2.05;
+}
+
+.reader-empty {
+    text-align: center;
+    padding: 80px 24px;
+}
+
+.reader-empty h2 {
+    margin: 0 0 12px;
+    font-size: 1.8rem;
+}
+
+.reader-empty p {
+    margin: 0 auto 24px;
+    max-width: 48ch;
+    text-indent: 0;
+    color: var(--r-muted);
+}
+
+.reader-empty-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.reader-info h1 {
+    font-size: 1.4rem;
+    margin: 0 0 6px;
+    font-weight: 700;
+}
+.reader-info .meta {
+    font-size: 0.95rem;
+    color: var(--r-muted);
+}
+
+.reader-controls {
+    display: flex;
+    gap: 12px;
+}
+
+.reader-controls .icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    background: transparent;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: var(--r-muted);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.reader-controls .icon-btn:hover {
+    background: rgba(42, 44, 49, 0.05);
+    color: var(--r-text);
+}
+body.dark-mode .reader-controls .icon-btn:hover { background: rgba(255,255,255,0.06); }
+
+/* The actual reading content */
+.reader-content {
+    width: 100%;
+    max-width: 800px;
+    padding: 64px 24px 120px;
+    font-family: "Georgia", "Palatino Linotype", "ChaoTu", "PingFang SC", "Microsoft YaHei", serif;
+    font-size: 1.35rem; /* Reader default */
+    line-height: 2.1;
+    letter-spacing: 0.02em;
+}
+
+.reader-content p {
+    margin-bottom: 1.8em;
+    text-indent: 2em; /* Chinese convention */
+}
+
+/* Custom Markdown tags styling */
+.mk-highlight {
+    background: rgba(162, 59, 114, 0.12); /* A subtle red-purple for highlight */
+    color: #a23b72;
+    padding: 0 4px;
+    border-radius: 4px;
+    font-weight: 700;
+}
+body.dark-mode .mk-highlight {
+    background: rgba(216, 112, 168, 0.15);
+    color: #df88b8;
+}
+
+.mk-wave {
+    text-decoration: underline wavy var(--r-accent);
+    text-underline-offset: 4px;
+}
+
+.mk-blur {
+    color: transparent !important;
+    text-shadow: 0 0 10px rgba(42, 44, 49, 0.7);
+    transition: text-shadow 0.3s ease, color 0.3s ease;
+    cursor: pointer;
+    user-select: none;
+}
+body.dark-mode .mk-blur {
+    text-shadow: 0 0 10px rgba(200, 200, 200, 0.7);
+}
+.mk-blur:hover, .mk-blur:active {
+    color: inherit !important;
+    text-shadow: none;
+}
+
+.mk-scratch {
+    background-color: var(--r-text);
+    color: var(--r-text);
+    border-radius: 4px;
+    padding: 0 4px;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    cursor: pointer;
+    user-select: none;
+}
+.mk-scratch:hover, .mk-scratch:active {
+    background-color: transparent;
+    color: inherit;
+}
+
+/* Jitter Effect */
+.mk-jitter {
+    color: #e53e3e; /* slightly red to emphasize panic */
+}
+body.dark-mode .mk-jitter { color: #f56565; }
+
+.mk-jitter > span {
+    position: relative;
+    display: inline;
+    animation: text-jitter 0.15s linear infinite;
+    /* We will use JS to assign random negative delays so they are out of sync */
+}
+
+@keyframes text-jitter {
+    0% { left: 0px; top: 0px; }
+    20% { left: -1px; top: 1px; }
+    40% { left: 1px; top: -1px; }
+    60% { left: -2px; top: 0px; }
+    80% { left: 1px; top: 2px; }
+    100% { left: 0px; top: -1px; }
+}
+
+/* Wobble Effect */
+.mk-wobble > span {
+    position: relative;
+    display: inline;
+    animation: text-wobble 2s ease-in-out infinite;
+    /* We will use JS to assign staggered delays to create a fluid wave */
+}
+
+@keyframes text-wobble {
+    0%, 100% { top: 0px; }
+    25% { top: -4px; }
+    75% { top: 4px; }
+}
+
+ruby { font-size: 1.1em; ruby-position: over; }
+rt { font-size: 0.6em; color: var(--r-muted); font-weight: 500; }
+
+.spoiler-block {
+    margin: 2em 0;
+    padding: 16px 24px;
+    background: rgba(42, 44, 49, 0.03);
+    border-left: 4px solid var(--r-accent);
+    border-radius: 0 12px 12px 0;
+    font-family: "Segoe UI", sans-serif;
+    font-size: 1rem;
+}
+body.dark-mode .spoiler-block { background: rgba(255,255,255,0.02); }
+
+.spoiler-block summary {
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--r-accent);
+    outline: none;
+}
+.spoiler-block p {
+    margin: 12px 0 0;
+    text-indent: 0;
+}
+
+.system-msg {
+    display: block;
+    text-align: center;
+    font-family: monospace;
+    text-indent: 0;
+    color: var(--r-accent);
+    letter-spacing: 0.1em;
+    margin: 3em 0;
+}
+
+.reader-nav {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 80px;
+    padding-top: 40px;
+    border-top: 1px solid var(--r-line);
+}
+
+.nav-btn {
+    text-decoration: none;
+    color: var(--r-muted);
+    font-weight: 700;
+    font-family: "Segoe UI", sans-serif;
+    font-size: 1rem;
+    padding: 16px 32px;
+    border-radius: 99px;
+    background: rgba(42, 44, 49, 0.04);
+    transition: all 0.2s;
+}
+body.dark-mode .nav-btn { background: rgba(255,255,255,0.04); }
+
+.nav-btn:hover {
+    background: var(--r-accent);
+    color: #fff !important;
+}
+
+.nav-btn.disabled {
+    opacity: 0.48;
+    pointer-events: none;
+}
+
+.fade-in { animation: fadeIn 0.8s ease-out forwards; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 768px) {
+    .reader-content { padding: 40px 20px 80px; font-size: 1.25rem; }
+    .nav-btn { padding: 12px 20px; font-size: 0.9rem; }
+    .reader-float-bar { right: 10px; }
+    .chapter-drawer { right: 12px; width: calc(100% - 24px); }
+}
+</style>
+<script>
+    // Just a tiny script for the dark mode toggle
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.querySelector('.theme-toggle');
+        const globalToggle = document.querySelector('.global-theme-toggle');
+        const drawerToggle = document.getElementById('chapter-drawer-toggle');
+        const drawer = document.getElementById('chapter-drawer');
+
+        if (btn) {
+            btn.addEventListener('click', () => {
+                if(globalToggle) {
+                    globalToggle.click();
+                } else {
+                    document.body.classList.toggle('dark-mode');
+                }
+            });
+        }
+
+        if (drawerToggle && drawer) {
+            drawerToggle.addEventListener('click', () => {
+                drawer.classList.toggle('open');
+            });
+
+            document.addEventListener('click', (event) => {
+                if (!drawer.classList.contains('open')) return;
+                if (drawer.contains(event.target) || drawerToggle.contains(event.target)) return;
+                drawer.classList.remove('open');
+            });
+        }
+    });
+</script>
+{% endblock %}

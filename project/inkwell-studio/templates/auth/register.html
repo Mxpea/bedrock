@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block title %}注册 - Bedrock{% endblock %}
+
+{% block content %}
+<section class="auth-shell">
+    <div class="auth-card">
+        <p class="eyebrow">注册</p>
+        <h1>创建新作者账号</h1>
+        <form class="stack-form" data-auth-form="register">
+            <label>
+                <span>用户名</span>
+                <input type="text" name="username" autocomplete="username" required>
+            </label>
+            <label>
+                <span>邮箱</span>
+                <input type="email" name="email" autocomplete="email" required>
+            </label>
+            <label>
+                <span>密码</span>
+                <input type="password" name="password" autocomplete="new-password" required>
+            </label>
+            <label>
+                <span>邀请码（可选）</span>
+                <input type="text" name="invite_code">
+            </label>
+            <button class="button primary" type="submit">注册</button>
+            <p class="form-message" data-form-message></p>
+        </form>
+    </div>
+</section>
+{% endblock %}

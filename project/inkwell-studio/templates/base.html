@@ -1,0 +1,29 @@
+{% load static %}
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Bedrock{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/site.css' %}">
+    <script defer src="{% static 'js/site.js' %}"></script>
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="/">Bedrock</a>
+        <nav class="topnav" id="global-nav">
+            <!-- Navigation will be populated by site.js based on role -->
+            <a href="/" data-nav="home">首页</a>
+            <a href="/novels/" data-nav="discover">发现</a>
+            <a href="/login/" data-nav="login" class="guest-only">登录</a>
+            <a href="/register/" data-nav="register" class="guest-only">注册</a>
+        </nav>
+        <button class="global-theme-toggle" aria-label="切换夜间模式" title="切换深色/浅色模式">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="theme-icon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </button>
+    </header>
+    <main class="page-shell">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

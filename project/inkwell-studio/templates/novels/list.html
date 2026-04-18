@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block title %}作品 - Bedrock{% endblock %}
+
+{% block content %}
+<section class="card card-wide">
+    <p class="eyebrow">作品</p>
+    <h1>小说列表</h1>
+    <p class="lead">作品页通过前端脚本加载 API 数据，模板与样式独立维护。</p>
+</section>
+
+<section class="feature-grid" data-novel-list>
+    <article class="card">
+        <h2>正在加载</h2>
+        <p>脚本会在页面加载后拉取你的作品数据。</p>
+    </article>
+</section>
+{% endblock %}

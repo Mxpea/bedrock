@@ -1,7 +1,8 @@
-import bleach
 from django.conf import settings
 from django.db import models
 
+from apps.customization.markdown_extensions import sanitize_advanced_content, sanitize_standard_content
+from apps.customization.models import AdvancedStyleGrant
 from apps.core.models import TimeStampedModel
 
 
@@ -36,9 +37,25 @@ class Chapter(TimeStampedModel):
         ordering = ["order", "id"]
         unique_together = ("novel", "order")
 
+    def _author_has_advanced_markdown_access(self) -> bool:
+        author = self.novel.author
+        return AdvancedStyleGrant.objects.filter(
+            user=author,
+            enabled=True,
+            scope=AdvancedStyleGrant.Scope.ACCOUNT,
+        ).exists() or AdvancedStyleGrant.objects.filter(
+            user=author,
+            novel=self.novel,
+            enabled=True,
+            scope=AdvancedStyleGrant.Scope.NOVEL,
+        ).exists()
+
     def save(self, *args, **kwargs):
-        # Keep rendered HTML sanitized to reduce stored-XSS risk.
-        self.content_html = bleach.clean(self.content_md, tags=[], attributes={}, strip=True).replace("\n", "<br>")
+        # Standard authors use strict token rendering; advanced authors get limited HTML tags.
+        if self._author_has_advanced_markdown_access():
+            self.content_html = sanitize_advanced_content(self.content_md)
+        else:
+            self.content_html = sanitize_standard_content(self.content_md)
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:

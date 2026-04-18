@@ -122,6 +122,29 @@ python manage.py migrate
 - `GET/PATCH/DELETE /api/novels/{id}/`
 - `GET/POST /api/chapters/`
 
+### 自定义权限模块接口
+
+- `GET/POST /api/customization/theme-configs/` 标准作者变量配置
+- `GET/POST /api/customization/css-requests/` 高阶 CSS 申请
+- `POST /api/customization/css-requests/{id}/review/` 管理员审批申请
+- `GET/PATCH /api/customization/style-grants/` 管理员查看与开关授权
+- `GET/POST /api/customization/homepage-configs/` 作者主页配置
+- `GET /api/customization/css-security-events/` 管理员查看安全告警
+
+说明：
+
+- 标准作者仅能通过 `ThemeConfig` 修改白名单变量。
+- 高阶作者能力通过审批后生成 `AdvancedStyleGrant`。
+- 若审批时检测到全屏劫持风险，系统会记录 `CSSSecurityEvent`，并临时禁用该条授权。
+
+## 页面入口
+
+- `/` 首页
+- `/login/` 登录页
+- `/register/` 注册页
+- `/dashboard/` 控制台页
+- `/novels/` 作品列表页
+
 ## 说明
 
 - 当前版本聚焦后端 MVP 闭环，Y.js 协作服务、ClamAV、CSS 白名单引擎、审计看板等作为下一阶段扩展。

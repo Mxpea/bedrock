@@ -1,4 +1,5 @@
 from django.contrib.auth.password_validation import validate_password
+from django.db import transaction
 from rest_framework import serializers
 
 from .models import InviteCode, User
@@ -28,14 +29,21 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         invite = validated_data.pop("invite_code", "")
         password = validated_data.pop("password")
-        user = User(**validated_data)
-        user.set_password(password)
-        user.save()
+        with transaction.atomic():
+            is_first_user = not User.objects.exists()
 
-        if invite:
-            invite.used_by = user
-            invite.is_active = False
-            invite.save(update_fields=["used_by", "is_active", "updated_at"])
+            user = User(**validated_data)
+            user.set_password(password)
+            if is_first_user:
+                user.role = User.Role.ADMIN
+                user.is_staff = True
+                user.is_superuser = True
+            user.save()
+
+            if invite:
+                invite.used_by = user
+                invite.is_active = False
+                invite.save(update_fields=["used_by", "is_active", "updated_at"])
 
         return user
 

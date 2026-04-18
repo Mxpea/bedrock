@@ -1,0 +1,727 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Bedrock - 创作台{% endblock %}
+
+{% block content %}
+<div class="editor-layout fade-in">
+    <!-- Editor Header -->
+    <header class="editor-header">
+        <div class="header-left">
+            <a href="/dashboard/" class="back-btn" title="返回工作台">← 返回</a>
+            <span class="breadcrumb" id="editor-breadcrumb">加载中...</span>
+        </div>
+        <div class="header-right">
+            <span class="status-msg text-muted" id="save-status"></span>
+            <button class="button secondary small" id="btn-preview">预览 (受限)</button>
+            <button class="button primary small" id="btn-save">保存</button>
+            <button class="icon-btn" title="作品设置">⚙</button>
+        </div>
+    </header>
+
+    <!-- Editor Workspace (2 Columns + DB panel) -->
+    <div class="editor-workspace">
+        <!-- 1. Markdown 编辑区 -->
+        <main class="editor-write-pane">
+            <div class="editor-toolbar">
+                <div class="tool-group flex-wrap">
+                    <!-- 基础格式 -->
+                    <button class="tool-btn" data-start="**" data-end="**" title="加粗 (Ctrl+B)"><b>B</b></button>
+                    <button class="tool-btn" data-start="*" data-end="*" title="斜体 (Ctrl+I)"><i>I</i></button>
+                    <button class="tool-btn" data-start="~~" data-end="~~" title="删除线"><s>S</s></button>
+                    <div class="divider"></div>
+                    <!-- 块级元素 -->
+                    <button class="tool-btn txt-icon" data-prefix="# " title="一级标题">H1</button>
+                    <button class="tool-btn txt-icon" data-prefix="## " title="二级标题">H2</button>
+                    <button class="tool-btn txt-icon" data-prefix="> " title="引用块">”</button>
+                    <button class="tool-btn txt-icon" data-prefix="- " title="无序列表">•</button>
+                    <div class="divider"></div>
+                    <!-- 扩展语法交互 -->
+                    <button class="tool-btn syntax-custom" data-start="{高亮|" data-end="}" title="插入特殊高亮块">{高亮}</button>
+                    <button class="tool-btn syntax-custom" data-start="{波浪|" data-end="}" title="文字波浪下划线">{波浪}</button>
+                    <button class="tool-btn syntax-custom" data-start="{抖动|" data-end="}" title="文字随机抖动，营造慌张感">{抖动}</button>
+                    <button class="tool-btn syntax-custom" data-start="{晃动|" data-end="}" title="文字上下波浪形晃动">{晃动}</button>
+                    <!-- 数据库插入 -->
+                    <button class="tool-btn txt-icon" title="引用快捷键" style="color: var(--accent); font-weight: bold;" disabled>@ 引用</button>
+                    <div class="divider"></div>
+                    <!-- 字体选择器 -->
+                    <select id="font-selector" class="tool-select" title="选择并应用自定义字体">
+                        <option value="">选择字体...</option>
+                    </select>
+                    <button id="upload-font-btn" class="icon-btn" title="上传字体" style="font-size: 1rem;">↑</button>
+                </div>
+            </div>
+            
+            <div class="editor-body">
+                <input type="text" id="chapter-title-input" class="chapter-title-input" value="" placeholder="输入章节标题..." />
+                <textarea id="main-editor-area" class="chapter-content-input" placeholder="在这里开始你的创作..."></textarea>
+            </div>
+        </main>
+
+        <!-- 3. 右侧数据库面板 (可收缩) -->
+        <aside class="editor-side-panel">
+            <div class="panel-tabs">
+                <button class="tab-btn active" title="章节导航">📜 章节</button>
+                <button class="tab-btn" title="大纲">📁 数据库</button>
+            </div>
+            <div class="panel-content" id="chapter-list-panel" style="display: flex; gap: 8px; flex-direction: column;">
+                <button class="button secondary small" id="btn-new-chapter">+ 新建章节</button>
+                <div id="chapter-list-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
+                    <p class="text-muted" style="text-align: center; margin-top: 24px;">加载中...</p>
+                </div>
+                <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--line);">
+                    <p id="word-count" class="text-muted" style="font-size: 0.85rem; margin: 0;">字数：0</p>
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<!-- Upload Font Modal -->
+<dialog id="font-upload-modal" class="modal">
+    <div class="modal-content">
+        <h3>上传自定义字体</h3>
+        <p class="text-muted">支持 .ttf, .otf, .woff 或 .woff2 格式格式。上传后可以在编辑器内通过下拉框快速应用。</p>
+        <form id="font-upload-form" class="stack-form">
+            <label>
+                <span>字体名称</span>
+                <input type="text" name="name" required placeholder="例如：汉仪文黑">
+            </label>
+            <label>
+                <span>字体文件 (.ttf/.otf/.woff2)</span>
+                <input type="file" name="font_file" accept=".ttf,.otf,.woff,.woff2" required>
+            </label>
+            <div class="form-actions mt-3">
+                <button type="button" class="button secondary btn-cancel">取消</button>
+                <button type="submit" class="button primary">上传并加载</button>
+            </div>
+            <p id="font-upload-msg" class="form-message"></p>
+        </form>
+    </div>
+</dialog>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const editor = document.getElementById('main-editor-area');
+    
+    // Auto-resize textarea
+    const resizeEditor = () => {
+        editor.style.height = 'auto';
+        editor.style.height = editor.scrollHeight + 'px';
+    };
+    editor.addEventListener('input', resizeEditor);
+    // Initial resize map slightly later to ensure rendering is complete
+    setTimeout(resizeEditor, 10);
+
+    // Generic formatting wrapping logic for Markdown tags
+    const insertTag = (startTag, endTag) => {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const text = editor.value;
+        const selectedText = text.substring(start, end);
+        const replacement = startTag + selectedText + endTag;
+        
+        editor.value = text.substring(0, start) + replacement + text.substring(end);
+        
+        // Adjust cursor intelligently
+        if (start === end) {
+            editor.selectionStart = editor.selectionEnd = start + startTag.length;
+        } else {
+            editor.selectionStart = editor.selectionEnd = start + replacement.length;
+        }
+        editor.focus();
+        resizeEditor();
+    };
+
+    // Generic logic specifically for block prefixes like H1 (# ), Lists (- )
+    const insertPrefix = (prefix) => {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const text = editor.value;
+        
+        // Find the absolute start of the current active line
+        let lineStart = text.lastIndexOf('\n', start - 1);
+        lineStart = (lineStart === -1) ? 0 : lineStart + 1;
+        
+        editor.value = text.substring(0, lineStart) + prefix + text.substring(lineStart);
+        
+        // Preserve user selection cursor movement
+        editor.selectionStart = start + prefix.length;
+        editor.selectionEnd = end + prefix.length;
+        editor.focus();
+        resizeEditor();
+    };
+
+    // Auto script binder for ALL toolbar buttons driven by pure data attributes!
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const { start, end, prefix } = btn.dataset;
+            if (start !== undefined && end !== undefined) {
+                insertTag(start, end);
+            } else if (prefix !== undefined) {
+                insertPrefix(prefix);
+            }
+        });
+    });
+
+    // Capture Ctrl+B, Ctrl+I for shortcuts
+    editor.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey) {
+            if (e.key === 'b' || e.key === 'B') {
+                e.preventDefault();
+                insertTag('**', '**');
+            }
+            if (e.key === 'i' || e.key === 'I') {
+                e.preventDefault();
+                insertTag('*', '*');
+            }
+        }
+    });
+
+    // Capture Tab for indentation in textarea
+    editor.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            insertTag('    ', '');
+        }
+    });
+
+    // Custom Font Logic
+    const fontSelector = document.getElementById('font-selector');
+    const uploadFontBtn = document.getElementById('upload-font-btn');
+    const fontModal = document.getElementById('font-upload-modal');
+    const fontForm = document.getElementById('font-upload-form');
+    const fontUploadMsg = document.getElementById('font-upload-msg');
+
+    // Editor data implementation
+    const titleInput = document.getElementById('chapter-title-input');
+    const wordCount = document.getElementById('word-count');
+    const saveStatus = document.getElementById('save-status');
+    const btnSave = document.getElementById('btn-save');
+    const btnPreview = document.getElementById('btn-preview');
+    const breadcrumb = document.getElementById('editor-breadcrumb');
+    
+    let currentChapterId = new URLSearchParams(window.location.search).get('chapter_id');
+    let currentNovelId = new URLSearchParams(window.location.search).get('novel_id');
+    let isSaving = false;
+
+    // Word count update
+    const updateWordCount = () => {
+        const text = editor.value || "";
+        wordCount.textContent = `字数：${text.replace(/\\s/g, '').length}`;
+    };
+    editor.addEventListener('input', updateWordCount);
+
+    const checkAuth = () => localStorage.getItem("bedrock_access");
+
+    const loadChapterList = async (novelId) => {
+        const token = checkAuth();
+        if (!token || !novelId) return;
+        const container = document.getElementById('chapter-list-container');
+        try {
+            const res = await fetch(`/api/chapters/?novel=${novelId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (res.ok) {
+                const data = await res.json();
+                const chapters = data.results || data;
+                if (!chapters.length) {
+                    container.innerHTML = '<p class="text-muted" style="text-align:center; font-size: 0.85rem;">暂无章节</p>';
+                } else {
+                    container.innerHTML = chapters.map(ch => 
+                        `<div class="chapter-item ${ch.id == currentChapterId ? 'active' : ''}" 
+                              style="padding: 8px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;"
+                              onclick="window.location.href='/editor/?chapter_id=${ch.id}'">
+                            ${ch.title}
+                        </div>`
+                    ).join('');
+                }
+            }
+        } catch (e) {
+            container.innerHTML = '<p class="text-danger">加载失败</p>';
+        }
+    };
+
+    document.getElementById('btn-new-chapter')?.addEventListener('click', () => {
+        if (!currentNovelId) return alert('请先指定作品');
+        window.location.href = `/editor/?novel_id=${currentNovelId}`;
+    });
+
+    const loadChapter = async () => {
+        const token = checkAuth();
+        if (!token) return;
+        
+        try {
+            if (currentChapterId) {
+                const res = await fetch(`/api/chapters/${currentChapterId}/`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) {
+                    const data = await res.json();
+                    titleInput.value = data.title;
+                    editor.value = data.content_md;
+                    currentNovelId = data.novel;
+                    breadcrumb.textContent = `作品 #${data.novel} / ${data.title}`;
+                    resizeEditor();
+                    updateWordCount();
+                    loadChapterList(currentNovelId);
+                }
+            } else if (currentNovelId) {
+                // If only novel_id is provided, try to create a new chapter
+                breadcrumb.textContent = `作品 #${currentNovelId} / 新章节`;
+                loadChapterList(currentNovelId);
+            } else {
+                breadcrumb.textContent = `未指定作品`;
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const saveChapter = async () => {
+        const token = checkAuth();
+        if (!token || isSaving || !currentNovelId) return;
+
+        isSaving = true;
+        saveStatus.textContent = '保存中...';
+        btnSave.disabled = true;
+
+        const payload = {
+            title: titleInput.value || '未命名章节',
+            content_md: editor.value,
+            novel: currentNovelId
+        };
+
+        try {
+            const url = currentChapterId ? `/api/chapters/${currentChapterId}/` : '/api/chapters/';
+            const method = currentChapterId ? 'PUT' : 'POST';
+            
+            const res = await fetch(url, {
+                method,
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                if (!currentChapterId) {
+                    currentChapterId = data.id;
+                    window.history.replaceState({}, '', `/editor/?chapter_id=${data.id}`);
+                }
+                const now = new Date();
+                saveStatus.textContent = `已自动保存 ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                breadcrumb.textContent = `作品 #${data.novel} / ${data.title}`;
+            } else {
+                saveStatus.textContent = '保存失败';
+            }
+        } catch (err) {
+            saveStatus.textContent = '网络错误';
+        }
+
+        isSaving = false;
+        btnSave.disabled = false;
+    };
+
+    btnSave.addEventListener('click', saveChapter);
+    
+    // Auto-save every 30 seconds
+    setInterval(() => {
+        if (titleInput.value.trim() !== '' || editor.value.trim() !== '') {
+            saveChapter();
+        }
+    }, 30000);
+
+    // Ctrl+S / Cmd+S
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            saveChapter();
+        }
+    });
+
+    btnPreview.addEventListener('click', () => {
+        if (currentChapterId) {
+            window.location.href = `/reader/?chapter_id=${currentChapterId}`;
+        }
+    });
+
+    // Load initial data
+    loadChapter();
+
+    // Load available fonts into the select dropdown
+    const renderFontSelector = () => {
+        if (!window.bedrockCustomFonts) return;
+        
+        fontSelector.innerHTML = '<option value="">应用字体...</option>';
+        window.bedrockCustomFonts.forEach(font => {
+            const option = document.createElement('option');
+            option.value = font.name;
+            option.textContent = font.name;
+            option.style.fontFamily = `"${font.name}", sans-serif`;
+            fontSelector.appendChild(option);
+        });
+    };
+
+    window.addEventListener('bedrockFontsLoaded', renderFontSelector);
+    if (window.bedrockCustomFonts) renderFontSelector();
+
+    fontSelector.addEventListener('change', (e) => {
+        const fontName = e.target.value;
+        if (!fontName) return;
+        // Inject Custom Font Markdown Syntax
+        insertTag(`{字体:${fontName}|`, `}`);
+        e.target.value = ''; // Reset selection
+    });
+
+    uploadFontBtn.addEventListener('click', () => {
+        fontModal.showModal();
+        fontForm.reset();
+        fontUploadMsg.textContent = '';
+    });
+
+    fontModal.querySelector('.btn-cancel').addEventListener('click', () => fontModal.close());
+
+    fontForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const token = localStorage.getItem("bedrock_access");
+        if (!token) {
+            fontUploadMsg.textContent = '未登录，无法上传字体。';
+            return;
+        }
+
+        const formData = new FormData(fontForm);
+        fontUploadMsg.textContent = '上传中，请稍候...';
+
+        try {
+            const response = await fetch('/api/customization/fonts/', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (!response.ok) {
+                fontUploadMsg.textContent = '上传失败：' + response.statusText;
+                return;
+            }
+
+            fontUploadMsg.textContent = '上传成功！';
+            // Trigger global reload of fonts in site.js
+            if(window.loadCustomFonts) await window.loadCustomFonts();
+            fontModal.close();
+        } catch (error) {
+            fontUploadMsg.textContent = '网络错误。';
+        }
+    });
+
+});
+</script>
+
+<style>
+/* Editor Page Layout */
+.page-shell:has(.editor-layout) {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    height: calc(100vh - 72px); /* minus topbar */
+}
+
+.editor-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--bg);
+    border-top: 1px solid var(--line);
+    transition: background 0.4s ease;
+}
+
+/* Header */
+.editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-soft);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.back-btn {
+    text-decoration: none;
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+.back-btn:hover { color: var(--accent); }
+
+.breadcrumb {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.icon-btn {
+    border: none;
+    background: transparent;
+    font-size: 1.2rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 4px;
+}
+.icon-btn:hover { background: rgba(0,0,0,0.05); color: var(--accent-strong); }
+
+/* Workspace */
+.editor-workspace {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.editor-write-pane {
+    flex: 1.2;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--line);
+    min-width: 320px;
+    background: var(--bg);
+}
+
+.editor-preview-pane {
+    flex: 1;
+    background: var(--bg-soft);
+    padding: 32px 40px;
+    overflow-y: auto;
+    border-right: 1px solid var(--line);
+    min-width: 320px;
+}
+
+.preview-content {
+    max-width: 600px;
+    margin: 0 auto;
+    font-family: inherit;
+    line-height: 1.8;
+}
+
+/* Side Panel */
+.editor-side-panel {
+    width: 260px;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--line);
+}
+
+.tab-btn {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 12px 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+}
+.tab-btn.active, .tab-btn:hover {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.panel-content {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.db-item {
+    padding: 8px 12px;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+.db-item:hover {
+    background: rgba(22, 50, 79, 0.05);
+}
+body.dark-mode .db-item:hover { background: rgba(255,255,255,0.05); }
+
+.chapter-item:hover { background: rgba(22, 50, 79, 0.04); }
+body.dark-mode .chapter-item:hover { background: rgba(255, 255, 255, 0.04); }
+
+.chapter-item.active {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(22, 50, 79, 0.15);
+}
+body.dark-mode .chapter-item.active {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.editor-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+}
+
+.editor-toolbar {
+    height: auto;
+    min-height: 52px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 24px;
+    background: var(--bg-soft);
+    transition: background 0.4s ease;
+}
+
+.tool-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap; /* support overflowing toolbars securely */
+}
+.tool-group.right { gap: 16px; margin-left: left; }
+
+.tool-btn {
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 6px;
+    min-width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 1.05rem;
+    transition: all 0.2s;
+    font-family: "Segoe UI", sans-serif;
+    padding: 0 6px;
+}
+.tool-btn.txt-icon { font-weight: 700; font-size: 0.95rem; }
+.tool-btn:hover { background: rgba(22, 50, 79, 0.06); border-color: rgba(22, 50, 79, 0.1); }
+body.dark-mode .tool-btn:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.1); }
+
+.tool-btn.syntax-custom { width: auto; padding: 0 8px; font-family: monospace; font-size: 0.85rem; color: var(--accent); background: rgba(22, 50, 79, 0.04); border-color: rgba(22, 50, 79, 0.1); }
+body.dark-mode .tool-btn.syntax-custom { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); }
+
+.divider { width: 1px; height: 20px; background: var(--line); margin: 0 8px; }
+
+.status-msg { font-size: 0.85rem; color: var(--muted); }
+
+.editor-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 32px 0 64px;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.chapter-title-input {
+    border: none;
+    outline: none;
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--accent-strong);
+    padding: 0 24px 24px;
+    background: transparent;
+    font-family: inherit;
+    transition: color 0.4s ease;
+}
+.chapter-title-input::placeholder { color: rgba(22, 50, 79, 0.2); }
+body.dark-mode .chapter-title-input::placeholder { color: rgba(255, 255, 255, 0.2); }
+
+.chapter-content-input {
+    flex: 1;
+    min-height: 50vh; /* Make sure there gets some room to type */
+    border: none;
+    outline: none;
+    resize: none; /* Auto-expand height handled by JS */
+    padding: 0 24px;
+    font-size: 1.15rem;
+    line-height: 1.9;
+    color: var(--text);
+    background: transparent;
+    font-family: "Segoe UI", "PingFang SC", sans-serif;
+    transition: color 0.4s ease;
+    overflow: hidden; /* Hide scrollbar when auto expanding */
+}
+.chapter-content-input::placeholder { color: rgba(22, 50, 79, 0.2); }
+body.dark-mode .chapter-content-input::placeholder { color: rgba(255, 255, 255, 0.2); }
+
+.button.small { padding: 6px 16px; font-size: 0.85rem; min-width: auto; }
+
+/* Modals & Dialogs for Font Upload */
+.modal {
+    border: none;
+    border-radius: 20px;
+    padding: 0;
+    background: transparent;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    max-width: 480px;
+    width: 90%;
+    margin: auto auto; 
+    color: var(--text);
+}
+.modal::backdrop {
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+}
+.modal-content {
+    background: var(--bg);
+    padding: 32px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    color: var(--text);
+}
+.modal-content h3 { margin-top: 0; color: var(--text); margin-bottom: 12px; }
+.tool-select {
+    border: 1px solid var(--line);
+    background: var(--bg-soft);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    height: 32px;
+    cursor: pointer;
+    min-width: 120px;
+}
+.mt-3 { margin-top: 24px; }
+
+.fade-in { animation: fadeIn 0.4s ease-out forwards; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 768px) {
+    .editor-sidebar { display: none; }
+}
+</style>
+{% endblock %}
