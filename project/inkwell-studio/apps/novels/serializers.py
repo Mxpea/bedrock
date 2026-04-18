@@ -64,8 +64,6 @@ class ChapterSerializer(serializers.ModelSerializer):
 
 class CharacterSerializer(serializers.ModelSerializer):
     avatar_url = serializers.SerializerMethodField()
-    appearances_count = serializers.SerializerMethodField()
-    mention_chapters = serializers.SerializerMethodField()
 
     class Meta:
         model = Character
@@ -85,15 +83,13 @@ class CharacterSerializer(serializers.ModelSerializer):
             "notes",
             "relationships",
             "chapter_mentions",
-            "mention_chapters",
-            "appearances_count",
             "is_starred",
             "is_pinned",
             "sort_order",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["chapter_mentions", "avatar_url", "mention_chapters", "appearances_count"]
+        read_only_fields = ["chapter_mentions", "avatar_url"]
 
     def get_avatar_url(self, obj):
         if not obj.avatar:
@@ -101,12 +97,6 @@ class CharacterSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         url = obj.avatar.url
         return request.build_absolute_uri(url) if request else url
-
-    def get_mention_chapters(self, obj):
-        return obj.compute_chapter_mentions()
-
-    def get_appearances_count(self, obj):
-        return len(obj.compute_chapter_mentions())
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

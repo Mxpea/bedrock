@@ -1,3 +1,4 @@
+import bleach
 from rest_framework import serializers
 
 from .css_validator import validate_advanced_css, validate_standard_theme_variables
@@ -185,6 +186,24 @@ class AuthorHomepageConfigSerializer(serializers.ModelSerializer):
         if not result.is_valid:
             raise serializers.ValidationError(result.blocked_reasons)
         return value
+
+    def validate_custom_html(self, value):
+        if not value:
+            return value
+
+        allowed_tags = [
+            "p", "br", "hr", "strong", "em", "del", "s",
+            "a", "ul", "ol", "li",
+            "h1", "h2", "h3", "h4", "h5", "h6",
+            "img", "blockquote", "pre", "code",
+            "span", "div", "i", "b",
+        ]
+        allowed_attrs = {
+            "a": ["href", "title", "target", "rel"],
+            "img": ["src", "alt", "title"],
+            "*": ["class", "id"],
+        }
+        return bleach.clean(value, tags=allowed_tags, attributes=allowed_attrs, protocols=["http", "https"], strip=True)
 
 
 class CSSSecurityEventSerializer(serializers.ModelSerializer):

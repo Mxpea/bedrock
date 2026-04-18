@@ -1,5 +1,6 @@
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from .models import InviteCode, User
@@ -54,7 +55,8 @@ class RegisterSerializer(serializers.ModelSerializer):
             if invite:
                 invite.used_by = user
                 invite.is_active = False
-                invite.save(update_fields=["used_by", "is_active", "updated_at"])
+                invite.used_at = timezone.now()
+                invite.save(update_fields=["used_by", "is_active", "used_at", "updated_at"])
 
         return user
 

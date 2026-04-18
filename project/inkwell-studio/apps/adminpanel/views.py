@@ -112,6 +112,7 @@ class WorkspaceManageView(AdminRequiredMixin, TemplateView):
             workspace.save(update_fields=["visibility", "updated_at"])
             messages.success(request, "已强制下线预览链接")
         elif action == "clear_cache":
+            cache.clear()
             messages.success(request, "已执行缓存清理（当前为全局缓存级）")
 
         write_audit(request.user, f"admin.workspace.{action}", "workspace", workspace.id, {"title": workspace.title})
