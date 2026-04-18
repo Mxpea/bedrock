@@ -27,18 +27,32 @@ class CustomFontSerializer(serializers.ModelSerializer):
 
 
 class ThemeConfigSerializer(serializers.ModelSerializer):
+    background_image_url = serializers.SerializerMethodField()
+
     class Meta:
         model = ThemeConfig
         fields = [
             "id",
             "novel",
             "page_bg_color",
+            "background_image",
+            "background_image_url",
+            "background_mode",
+            "background_opacity",
             "text_font_family",
             "link_color",
             "paragraph_spacing",
             "created_at",
             "updated_at",
         ]
+
+    def get_background_image_url(self, obj):
+        request = self.context.get("request")
+        if obj.background_image and hasattr(obj.background_image, "url"):
+            if request:
+                return request.build_absolute_uri(obj.background_image.url)
+            return obj.background_image.url
+        return ""
 
     def validate(self, attrs):
         variables = {
@@ -61,6 +75,11 @@ class ThemeConfigSerializer(serializers.ModelSerializer):
         if novel.author != request.user:
             raise serializers.ValidationError("只能配置自己的作品")
         return novel
+
+    def validate_background_opacity(self, value):
+        if value < 0 or value > 1:
+            raise serializers.ValidationError("背景透明度需在 0 到 1 之间")
+        return value
 
 
 class CustomCSSRequestSerializer(serializers.ModelSerializer):

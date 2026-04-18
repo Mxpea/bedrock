@@ -6,7 +6,13 @@
 {% endblock %}
 
 {% block content %}
-<div class="reader-shell fade-in">
+{% if reader_theme and reader_theme.background_image %}
+<div class="reader-shell fade-in reader-has-bg {% if reader_theme.background_mode == 'fixed_cover' %}reader-bg-fixed{% else %}reader-bg-scroll{% endif %}" style="--reader-theme-bg: {{ reader_theme.page_bg_color }}; --reader-theme-font: '{{ reader_theme.text_font_family }}'; --reader-theme-link: {{ reader_theme.link_color }}; --reader-theme-spacing: {{ reader_theme.paragraph_spacing }}; --reader-theme-bg-opacity: {{ reader_theme.background_opacity|default:'0.22' }}; --reader-theme-bg-image: url('{{ reader_theme.background_image.url }}');">
+{% elif reader_theme %}
+<div class="reader-shell fade-in {% if reader_theme.background_mode == 'fixed_cover' %}reader-bg-fixed{% else %}reader-bg-scroll{% endif %}" style="--reader-theme-bg: {{ reader_theme.page_bg_color }}; --reader-theme-font: '{{ reader_theme.text_font_family }}'; --reader-theme-link: {{ reader_theme.link_color }}; --reader-theme-spacing: {{ reader_theme.paragraph_spacing }}; --reader-theme-bg-opacity: {{ reader_theme.background_opacity|default:'0.22' }};">
+{% else %}
+<div class="reader-shell fade-in reader-bg-scroll">
+{% endif %}
     <!-- Reader Topbar Area -->
     <header class="reader-header immersive-header">
         <div class="reader-info">
@@ -69,7 +75,7 @@
         {% else %}
         <section class="reader-empty">
             <h2>暂无可阅读章节</h2>
-            <p>没有找到可访问的已发布章节。你可以先去作品页创建并发布章节，或从公开作品进入阅读。</p>
+                <p>没有找到可访问章节。你可以先去作品页创建章节，或从公开作品进入阅读。</p>
             <div class="reader-empty-actions">
                 <a class="nav-btn index" href="/novels/">前往作品列表</a>
                 <a class="nav-btn index" href="/dashboard/">进入工作台</a>
@@ -127,12 +133,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
 /* Light / Dark Mode Vars specific to Reader */
 .reader-shell {
-    --r-bg: #fdfaf5;
+    --r-bg: var(--reader-theme-bg, #fdfaf5);
     --r-text: #2a2c31;
     --r-muted: #7c889a;
     --r-line: rgba(42, 44, 49, 0.1);
-    --r-accent: #3d5a80;
-    font-family: inherit;
+    --r-accent: var(--reader-theme-link, #3d5a80);
+    --r-paragraph-spacing: var(--reader-theme-spacing, 1.8em);
+    --r-bg-opacity: var(--reader-theme-bg-opacity, 0.22);
+    font-family: var(--reader-theme-font, inherit);
 }
 
 body.dark-mode .reader-shell {
@@ -153,6 +161,36 @@ body.dark-mode .reader-shell {
     align-items: center;
     transition: background 0.4s ease, color 0.4s ease;
     position: relative;
+}
+
+.reader-has-bg::before {
+    content: "";
+    pointer-events: none;
+    opacity: var(--r-bg-opacity);
+    background-image: var(--reader-theme-bg-image);
+    background-position: top left;
+    z-index: 0;
+}
+
+.reader-bg-scroll::before {
+    position: absolute;
+    inset: 0;
+    background-repeat: repeat;
+    background-size: auto;
+    background-attachment: scroll;
+}
+
+.reader-bg-fixed::before {
+    position: fixed;
+    inset: 0;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center center;
+}
+
+.reader-shell > * {
+    position: relative;
+    z-index: 1;
 }
 
 .immersive-header {
@@ -401,7 +439,7 @@ body.dark-mode .reader-controls .icon-btn:hover { background: rgba(255,255,255,0
 }
 
 .reader-content p {
-    margin-bottom: 1.8em;
+    margin-bottom: var(--r-paragraph-spacing);
     text-indent: 0;
 }
 

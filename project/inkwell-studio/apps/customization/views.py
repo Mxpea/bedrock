@@ -1,5 +1,6 @@
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from .css_validator import validate_advanced_css
@@ -37,6 +38,51 @@ class ThemeConfigViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return ThemeConfig.objects.select_related("novel").filter(novel__author=self.request.user)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        parser_classes=[MultiPartParser, FormParser],
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def upload_background(self, request):
+        novel_id = request.data.get("novel")
+        image_file = request.FILES.get("background_image")
+
+        if not novel_id:
+            return Response({"detail": "缺少工作区ID"}, status=status.HTTP_400_BAD_REQUEST)
+        if not image_file:
+            return Response({"detail": "未上传背景图片"}, status=status.HTTP_400_BAD_REQUEST)
+        if not (image_file.content_type or "").startswith("image/"):
+            return Response({"detail": "仅支持图片文件"}, status=status.HTTP_400_BAD_REQUEST)
+        if image_file.size > 12 * 1024 * 1024:
+            return Response({"detail": "背景图片大小不能超过 12MB"}, status=status.HTTP_400_BAD_REQUEST)
+
+        from apps.novels.models import Novel
+
+        novel = Novel.objects.filter(id=novel_id, author=request.user, is_deleted=False).first()
+        if not novel:
+            return Response({"detail": "工作区不存在或无权访问"}, status=status.HTTP_404_NOT_FOUND)
+
+        theme_config, _ = ThemeConfig.objects.get_or_create(novel=novel)
+        if theme_config.background_image:
+            theme_config.background_image.delete(save=False)
+
+        theme_config.background_image = image_file
+        theme_config.save(update_fields=["background_image", "updated_at"])
+
+        serializer = self.get_serializer(theme_config)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    def clear_background(self, request, pk=None):
+        theme_config = self.get_object()
+        if theme_config.background_image:
+            theme_config.background_image.delete(save=False)
+            theme_config.background_image = None
+            theme_config.save(update_fields=["background_image", "updated_at"])
+        serializer = self.get_serializer(theme_config)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class CustomCSSRequestViewSet(viewsets.ModelViewSet):

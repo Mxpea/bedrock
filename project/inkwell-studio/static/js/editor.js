@@ -383,6 +383,109 @@ document.addEventListener('DOMContentLoaded', () => {
     const workspaceContext = resolveWorkspaceContext();
     let currentNovelId = workspaceContext.id;
     let isSaving = false;
+    let mentionCharacters = [];
+    let mentionOpen = false;
+    let mentionStart = -1;
+
+    const mentionPanel = document.createElement('div');
+    mentionPanel.className = 'editor-mention-panel';
+    mentionPanel.hidden = true;
+    document.body.appendChild(mentionPanel);
+
+    const closeMentionPanel = () => {
+        mentionOpen = false;
+        mentionStart = -1;
+        mentionPanel.hidden = true;
+        mentionPanel.innerHTML = '';
+    };
+
+    const loadMentionCharacters = async () => {
+        if (!currentNovelId) {
+            mentionCharacters = [];
+            return;
+        }
+        try {
+            const token = checkAuth();
+            if (!token) {
+                mentionCharacters = [];
+                return;
+            }
+            const response = await fetch(`/api/characters/?novel=${currentNovelId}`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            if (!response.ok) {
+                mentionCharacters = [];
+                return;
+            }
+            const payload = await response.json();
+            mentionCharacters = Array.isArray(payload) ? payload : (payload.results || []);
+        } catch {
+            mentionCharacters = [];
+        }
+    };
+
+    const insertMentionToken = (name, cursorEnd) => {
+        if (mentionStart < 0) return;
+        const text = editor.value;
+        const token = `{@人物:${name}}`;
+        editor.value = text.slice(0, mentionStart) + token + text.slice(cursorEnd);
+        const nextPos = mentionStart + token.length;
+        editor.selectionStart = nextPos;
+        editor.selectionEnd = nextPos;
+        resizeEditor();
+        recordHistory(true);
+        scheduleLivePreview();
+        closeMentionPanel();
+        editor.focus();
+    };
+
+    const openMentionPanel = (query, cursorEnd) => {
+        const lowered = (query || '').toLowerCase();
+        const matched = mentionCharacters.filter((item) => {
+            const byName = String(item.name || '').toLowerCase().includes(lowered);
+            const byAlias = (item.aliases || []).some((alias) => String(alias).toLowerCase().includes(lowered));
+            return byName || byAlias;
+        }).slice(0, 8);
+
+        if (!matched.length) {
+            closeMentionPanel();
+            return;
+        }
+
+        mentionPanel.innerHTML = matched.map((item, index) => `
+            <button type="button" class="editor-mention-item ${index === 0 ? 'active' : ''}" data-char-name="${item.name}">
+                <strong>${item.name}</strong>
+                <span>${item.role_title || item.summary || ''}</span>
+            </button>
+        `).join('');
+
+        const rect = editor.getBoundingClientRect();
+        mentionPanel.style.left = `${rect.left + 14}px`;
+        mentionPanel.style.top = `${Math.min(window.innerHeight - 220, rect.top + 56)}px`;
+        mentionPanel.hidden = false;
+        mentionOpen = true;
+
+        mentionPanel.querySelectorAll('.editor-mention-item').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                insertMentionToken(btn.dataset.charName || '', cursorEnd);
+            });
+        });
+    };
+
+    const handleMentionInput = () => {
+        const cursor = editor.selectionStart;
+        const textBefore = editor.value.slice(0, cursor);
+        const match = textBefore.match(/(^|\s)@([\u4e00-\u9fa5A-Za-z0-9_\-]{0,40})$/);
+        if (!match) {
+            closeMentionPanel();
+            return;
+        }
+
+        mentionStart = cursor - match[2].length - 1;
+        openMentionPanel(match[2], cursor);
+    };
 
     recordHistory(true);
 
@@ -449,6 +552,43 @@ document.addEventListener('DOMContentLoaded', () => {
         wordCount.textContent = `字数：${text.replace(/\s/g, '').length}`;
     };
     editor.addEventListener('input', updateWordCount);
+    editor.addEventListener('input', handleMentionInput);
+
+    editor.addEventListener('keydown', (event) => {
+        if (!mentionOpen) return;
+        if (event.key === 'Escape') {
+            closeMentionPanel();
+            return;
+        }
+
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Enter') {
+            return;
+        }
+
+        event.preventDefault();
+        const items = Array.from(mentionPanel.querySelectorAll('.editor-mention-item'));
+        if (!items.length) return;
+        const currentIndex = items.findIndex((item) => item.classList.contains('active'));
+
+        if (event.key === 'Enter') {
+            const active = items[currentIndex >= 0 ? currentIndex : 0];
+            if (active) {
+                insertMentionToken(active.dataset.charName || '', editor.selectionStart);
+            }
+            return;
+        }
+
+        items.forEach((item) => item.classList.remove('active'));
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        const next = (currentIndex + delta + items.length) % items.length;
+        items[next].classList.add('active');
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!mentionOpen) return;
+        if (event.target === editor || mentionPanel.contains(event.target)) return;
+        closeMentionPanel();
+    });
 
     const checkAuth = () => localStorage.getItem("bedrock_access");
 
@@ -612,6 +752,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (chapterStatus) chapterStatus.textContent = '状态：加载失败';
             if (breadcrumb) breadcrumb.textContent = '加载失败';
             loadChapterList(currentNovelId);
+        } finally {
+            loadMentionCharacters();
         }
     };
 

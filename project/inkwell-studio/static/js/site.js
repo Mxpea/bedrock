@@ -1,6 +1,7 @@
 const USER_CACHE_KEY = "bedrock_user_cache";
 const USER_TOKEN_CACHE_KEY = "bedrock_user_cache_token";
 const FONT_CACHE_KEY = "bedrock_fonts_loaded";
+const TOPBAR_COLLAPSE_KEY = "bedrock_topbar_collapsed";
 let currentUserPromise = null;
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -9,10 +10,43 @@ document.addEventListener("DOMContentLoaded", () => {
     setupWorkspaceDashboard();
     setupWorkspaceDiscover();
     setupGlobalTheme();
+    setupTopbarCollapse();
     loadCustomFonts();
     setupNavigation();
     setupWorkspaceSwitcher();
 });
+
+function setupTopbarCollapse() {
+    const topbar = document.getElementById("global-topbar");
+    const collapseBtn = document.getElementById("topbar-collapse-btn");
+    const expandBtn = document.getElementById("topbar-expand-btn");
+
+    if (!topbar || !collapseBtn || !expandBtn) {
+        return;
+    }
+
+    const setCollapsed = (collapsed, persist = true) => {
+        document.body.classList.toggle("topbar-collapsed", collapsed);
+        collapseBtn.setAttribute("aria-label", collapsed ? "展开顶栏" : "收起顶栏");
+        collapseBtn.title = collapsed ? "展开顶栏" : "收起顶栏";
+        expandBtn.hidden = !collapsed;
+
+        if (persist) {
+            localStorage.setItem(TOPBAR_COLLAPSE_KEY, collapsed ? "1" : "0");
+        }
+    };
+
+    setCollapsed(localStorage.getItem(TOPBAR_COLLAPSE_KEY) === "1", false);
+
+    collapseBtn.addEventListener("click", () => {
+        const collapsed = document.body.classList.toggle("topbar-collapsed");
+        setCollapsed(collapsed);
+    });
+
+    expandBtn.addEventListener("click", () => {
+        setCollapsed(false);
+    });
+}
 
 function getAccessToken() {
     return localStorage.getItem("bedrock_access");

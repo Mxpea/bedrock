@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Chapter, Novel
+from .models import Chapter, Novel, Character
 
 
 class NovelSerializer(serializers.ModelSerializer):
@@ -29,6 +29,7 @@ class NovelSerializer(serializers.ModelSerializer):
             "visibility",
             "last_open_module",
             "last_open_chapter_id",
+            "outline_canvas",
             "is_deleted",
             "author",
             "author_username",
@@ -59,3 +60,98 @@ class ChapterSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["content_html"]
+
+
+class CharacterSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+    appearances_count = serializers.SerializerMethodField()
+    mention_chapters = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Character
+        fields = [
+            "id",
+            "novel",
+            "name",
+            "aliases",
+            "avatar",
+            "avatar_url",
+            "role_title",
+            "gender",
+            "age_label",
+            "tags",
+            "summary",
+            "description",
+            "notes",
+            "relationships",
+            "chapter_mentions",
+            "mention_chapters",
+            "appearances_count",
+            "is_starred",
+            "is_pinned",
+            "sort_order",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["chapter_mentions", "avatar_url", "mention_chapters", "appearances_count"]
+
+    def get_avatar_url(self, obj):
+        if not obj.avatar:
+            return ""
+        request = self.context.get("request")
+        url = obj.avatar.url
+        return request.build_absolute_uri(url) if request else url
+
+    def get_mention_chapters(self, obj):
+        return obj.compute_chapter_mentions()
+
+    def get_appearances_count(self, obj):
+        return len(obj.compute_chapter_mentions())
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        mentions = instance.compute_chapter_mentions()
+        data["chapter_mentions"] = mentions
+        data["mention_chapters"] = mentions
+        data["appearances_count"] = len(mentions)
+        return data
+
+    def validate_novel(self, novel):
+        request = self.context.get("request")
+        if not request or novel.author != request.user:
+            raise serializers.ValidationError("只能操作自己的工作区人物")
+        return novel
+
+    def validate_aliases(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("别名必须为数组")
+        return [str(item).strip() for item in value if str(item).strip()]
+
+    def validate_tags(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("标签必须为数组")
+        tags = []
+        for item in value:
+            text = str(item).strip()
+            if text and text not in tags:
+                tags.append(text)
+        return tags
+
+    def validate_relationships(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("关系数据必须为数组")
+        return value
+
+    def create(self, validated_data):
+        instance = super().create(validated_data)
+        mentions = instance.compute_chapter_mentions()
+        instance.chapter_mentions = mentions
+        instance.save(update_fields=["chapter_mentions", "updated_at"])
+        return instance
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        mentions = instance.compute_chapter_mentions()
+        instance.chapter_mentions = mentions
+        instance.save(update_fields=["chapter_mentions", "updated_at"])
+        return instance

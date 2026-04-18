@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.views.generic import TemplateView
 
 from apps.customization.markdown_extensions import sanitize_advanced_content, sanitize_standard_content
+from apps.customization.models import ThemeConfig
 from apps.novels.models import Chapter, Novel
 
 User = get_user_model()
@@ -67,6 +68,22 @@ class WorkspacePageView(LoginRequiredMixin, TemplateView):
                 "module_label": dict(Novel.Module.choices).get(module, module),
             }
         )
+
+        if module == Novel.Module.APPEARANCE:
+            context.update(
+                {
+                    "theme_config": ThemeConfig.objects.filter(novel=workspace).first(),
+                    "theme_font_choices": ThemeConfig.SAFE_FONT_CHOICES,
+                }
+            )
+
+        if module == Novel.Module.OUTLINE:
+            context.update(
+                {
+                    "outline_canvas": workspace.outline_canvas or {},
+                }
+            )
+
         return context
 
 
@@ -83,12 +100,11 @@ class ReaderPageView(TemplateView):
         if user.is_authenticated:
             return base_qs.filter(
                 models.Q(novel__author=user)
-                | models.Q(novel__visibility__in=[Novel.Visibility.PUBLIC, Novel.Visibility.LINK], is_published=True)
+                | models.Q(novel__visibility__in=[Novel.Visibility.PUBLIC, Novel.Visibility.LINK])
             )
 
         return base_qs.filter(
             novel__visibility__in=[Novel.Visibility.PUBLIC, Novel.Visibility.LINK],
-            is_published=True,
         )
 
     def get_context_data(self, **kwargs):
@@ -135,6 +151,7 @@ class ReaderPageView(TemplateView):
                 "chapter_list": chapter_list_qs,
                 "prev_chapter_id": prev_chapter_id,
                 "next_chapter_id": next_chapter_id,
+                "reader_theme": ThemeConfig.objects.filter(novel=chapter.novel).first(),
             }
         )
         return context

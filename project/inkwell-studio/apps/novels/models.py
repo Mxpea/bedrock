@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+import re
 
 from apps.customization.markdown_extensions import sanitize_advanced_content, sanitize_standard_content
 from apps.customization.models import AdvancedStyleGrant
@@ -28,6 +29,7 @@ class Novel(TimeStampedModel):
     visibility = models.CharField(max_length=16, choices=Visibility.choices, default=Visibility.PRIVATE)
     last_open_module = models.CharField(max_length=24, choices=Module.choices, default=Module.WRITING)
     last_open_chapter_id = models.PositiveIntegerField(null=True, blank=True)
+    outline_canvas = models.JSONField(default=dict, blank=True)
     is_deleted = models.BooleanField(default=False)
 
     class Meta:
@@ -76,3 +78,63 @@ class Chapter(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.novel.title}-{self.title}"
+
+
+class Character(TimeStampedModel):
+    novel = models.ForeignKey(Novel, on_delete=models.CASCADE, related_name="characters")
+    name = models.CharField(max_length=120)
+    aliases = models.JSONField(default=list, blank=True)
+    avatar = models.ImageField(upload_to="character_avatars/", blank=True, null=True)
+    role_title = models.CharField(max_length=120, blank=True)
+    gender = models.CharField(max_length=20, blank=True)
+    age_label = models.CharField(max_length=40, blank=True)
+    tags = models.JSONField(default=list, blank=True)
+    summary = models.CharField(max_length=240, blank=True)
+    description = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+    relationships = models.JSONField(default=list, blank=True)
+    chapter_mentions = models.JSONField(default=list, blank=True)
+    is_starred = models.BooleanField(default=False)
+    is_pinned = models.BooleanField(default=False)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ["-is_pinned", "sort_order", "id"]
+        unique_together = ("novel", "name")
+
+    def __str__(self) -> str:
+        return f"{self.novel.title}-{self.name}"
+
+    def compute_chapter_mentions(self):
+        token_pat = re.compile(r"\{\s*@?人物\s*:\s*([^}]+?)\s*\}")
+        at_pat = re.compile(r"(?<![\w\u4e00-\u9fa5])@([\u4e00-\u9fa5A-Za-z0-9_\-]{2,40})")
+
+        names = {self.name.strip()}
+        names.update([str(alias).strip() for alias in (self.aliases or []) if str(alias).strip()])
+
+        hits = []
+        for chapter in self.novel.chapters.all().order_by("order", "id"):
+            text = chapter.content_md or ""
+            matched = False
+
+            for token_name in token_pat.findall(text):
+                if token_name.strip() in names:
+                    matched = True
+                    break
+
+            if not matched:
+                for at_name in at_pat.findall(text):
+                    if at_name.strip() in names:
+                        matched = True
+                        break
+
+            if matched:
+                hits.append(
+                    {
+                        "chapter_id": chapter.id,
+                        "chapter_title": chapter.title,
+                        "chapter_order": chapter.order,
+                    }
+                )
+
+        return hits

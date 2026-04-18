@@ -15,9 +15,9 @@ from django.db.models import Q
 
 from apps.customization.markdown_extensions import sanitize_advanced_content, sanitize_standard_content
 from apps.customization.models import AdvancedStyleGrant
-from .models import Chapter, Novel
+from .models import Chapter, Novel, Character
 from .permissions import CanReadNovel, IsAuthorOrReadOnly
-from .serializers import ChapterSerializer, NovelSerializer
+from .serializers import ChapterSerializer, NovelSerializer, CharacterSerializer
 
 
 class NovelViewSet(viewsets.ModelViewSet):
@@ -202,3 +202,128 @@ class ChapterViewSet(viewsets.ModelViewSet):
 
         stored_path = default_storage.save(storage_path, image_file)
         return Response({"url": default_storage.url(stored_path), "path": stored_path}, status=status.HTTP_201_CREATED)
+
+
+class CharacterViewSet(viewsets.ModelViewSet):
+    serializer_class = CharacterSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    ordering_fields = ["sort_order", "created_at", "updated_at", "name"]
+
+    def get_queryset(self):
+        queryset = Character.objects.select_related("novel").filter(
+            novel__author=self.request.user,
+            novel__is_deleted=False,
+        )
+
+        novel_id = self.request.GET.get("novel")
+        if novel_id:
+            queryset = queryset.filter(novel_id=novel_id)
+
+        keyword = (self.request.GET.get("q") or "").strip()
+        if keyword:
+            queryset = queryset.filter(
+                Q(name__icontains=keyword)
+                | Q(summary__icontains=keyword)
+                | Q(description__icontains=keyword)
+                | Q(notes__icontains=keyword)
+            )
+
+        tag = (self.request.GET.get("tag") or "").strip()
+        if tag:
+            queryset = queryset.filter(tags__contains=[tag])
+
+        starred = (self.request.GET.get("starred") or "").strip().lower()
+        if starred in {"1", "true", "yes"}:
+            queryset = queryset.filter(is_starred=True)
+
+        ordering = (self.request.GET.get("ordering") or "").strip()
+        if ordering:
+            return queryset.order_by(ordering)
+
+        return queryset.order_by("-is_pinned", "sort_order", "id")
+
+    def perform_create(self, serializer):
+        novel = serializer.validated_data["novel"]
+        if novel.is_locked:
+            raise PermissionDenied("工作区已被锁定，暂不可新建人物")
+        serializer.save()
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        if instance.novel.is_locked:
+            raise PermissionDenied("工作区已被锁定，暂不可编辑人物")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if instance.novel.is_locked:
+            raise PermissionDenied("工作区已被锁定，暂不可删除人物")
+        instance.delete()
+
+    @action(detail=False, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    def reorder(self, request):
+        ids = request.data.get("ids")
+        if not isinstance(ids, list):
+            return Response({"detail": "ids 必须为数组"}, status=status.HTTP_400_BAD_REQUEST)
+
+        items = list(self.get_queryset().filter(id__in=ids))
+        mapping = {item.pk: item for item in items}
+
+        update_items = []
+        for idx, raw_id in enumerate(ids):
+            try:
+                key = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            obj = mapping.get(key)
+            if not obj:
+                continue
+            obj.sort_order = idx
+            update_items.append(obj)
+
+        if update_items:
+            Character.objects.bulk_update(update_items, ["sort_order", "updated_at"])
+
+        return Response({"ok": True}, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def upload_avatar(self, request, pk=None):
+        character = self.get_object()
+        if character.novel.is_locked:
+            return Response({"detail": "工作区已被锁定，暂不可修改头像"}, status=status.HTTP_403_FORBIDDEN)
+
+        avatar_file = request.FILES.get("avatar")
+        if not avatar_file:
+            return Response({"detail": "未上传头像文件"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not (avatar_file.content_type or "").startswith("image/"):
+            return Response({"detail": "仅支持图片文件"}, status=status.HTTP_400_BAD_REQUEST)
+
+        max_size = 10 * 1024 * 1024
+        if avatar_file.size > max_size:
+            return Response({"detail": "头像大小不能超过 10MB"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if character.avatar:
+            character.avatar.delete(save=False)
+
+        ext = os.path.splitext(avatar_file.name or "")[1].lower()
+        if ext not in {".png", ".jpg", ".jpeg", ".webp", ".gif"}:
+            ext = ".png"
+
+        avatar_name = (
+            f"character-avatars/user_{request.user.id}/workspace_{character.novel_id}/"
+            f"character_{character.id}_{uuid.uuid4().hex[:10]}{ext}"
+        )
+
+        character.avatar.save(
+            avatar_name,
+            avatar_file,
+            save=True,
+        )
+
+        serializer = self.get_serializer(character)
+        return Response({"avatar_url": serializer.data.get("avatar_url", "")}, status=status.HTTP_200_OK)

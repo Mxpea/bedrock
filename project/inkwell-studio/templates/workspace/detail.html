@@ -53,13 +53,264 @@
         {% include 'workspace/modules/writing.html' %}
         {% elif module == 'outline' %}
         <section class="workspace-panel">
-            <h1>大纲</h1>
-            <p class="lead">已切换为工作区内大纲模块。后续可以扩展树形大纲与思维导图双视图。</p>
+            <div class="outline-head">
+                <div>
+                    <h1>故事线工作台</h1>
+                    <p class="lead">用节点与连线编织叙事结构。支持章节绑定、人物线标注、线段样式与自动保存。</p>
+                </div>
+                <div class="outline-head-actions">
+                    <button type="button" id="outline-view-canvas" class="button secondary active">画布视图</button>
+                    <button type="button" id="outline-view-tree" class="button secondary">树状视图</button>
+                    <button type="button" id="outline-auto-layout" class="button secondary">整理布局</button>
+                    <button type="button" id="outline-export-json" class="button secondary">导出 JSON</button>
+                    <button type="button" id="outline-save" class="button primary">保存大纲</button>
+                </div>
+            </div>
+
+            <div class="outline-toolbar">
+                <div class="outline-toolbar-group">
+                    <button type="button" class="button secondary" data-outline-create="chapter">+ 章节节点</button>
+                    <button type="button" class="button secondary" data-outline-create="plot">+ 情节点</button>
+                    <button type="button" class="button secondary" data-outline-create="character">+ 人物节点</button>
+                    <button type="button" class="button secondary" data-outline-create="note">+ 注释节点</button>
+                </div>
+                <div class="outline-toolbar-group">
+                    <input id="outline-search" type="search" placeholder="搜索节点标题、标签...">
+                    <select id="outline-filter-type">
+                        <option value="">全部类型</option>
+                        <option value="chapter">章节节点</option>
+                        <option value="plot">情节点</option>
+                        <option value="character">人物节点</option>
+                        <option value="note">注释节点</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="outline-layout" id="outline-layout" data-view-mode="canvas">
+                <section class="outline-canvas-wrap" id="outline-canvas-wrap">
+                    <div class="outline-canvas" id="outline-canvas" tabindex="0" aria-label="故事线画布">
+                        <div class="outline-grid" id="outline-grid"></div>
+                        <div class="outline-viewport" id="outline-viewport">
+                            <svg id="outline-edge-layer" class="outline-edge-layer" xmlns="http://www.w3.org/2000/svg">
+                                <defs>
+                                    <marker id="outline-arrow-end" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+                                        <path d="M0,0 L10,4 L0,8 Z" fill="currentColor"></path>
+                                    </marker>
+                                </defs>
+                            </svg>
+                            <div id="outline-node-layer" class="outline-node-layer"></div>
+                        </div>
+                        <div id="outline-minimap" class="outline-minimap"></div>
+                        <div id="outline-canvas-hint" class="outline-canvas-hint">中键或空格+拖拽平移，滚轮缩放，Delete 删除，Ctrl+Z/Y 撤销重做</div>
+                    </div>
+
+                    <div id="outline-tree-view" class="outline-tree-view" hidden></div>
+                </section>
+
+                <aside class="outline-sidepanel" id="outline-sidepanel">
+                    <section class="outline-card">
+                        <h3>选中项</h3>
+                        <div id="outline-empty-selection" class="text-muted">未选中节点或连线</div>
+
+                        <form id="outline-node-form" class="stack-form" hidden>
+                            <label><span>节点标题</span><input id="outline-node-title" type="text" maxlength="160"></label>
+                            <label><span>节点类型</span>
+                                <select id="outline-node-type">
+                                    <option value="chapter">章节节点</option>
+                                    <option value="plot">情节点</option>
+                                    <option value="character">人物节点</option>
+                                    <option value="note">注释节点</option>
+                                </select>
+                            </label>
+                            <label><span>颜色标签</span><input id="outline-node-color" type="color" value="#16324f"></label>
+                            <label><span>描述（Markdown）</span><textarea id="outline-node-description" rows="4"></textarea></label>
+                            <label><span>标签（逗号分隔）</span><input id="outline-node-tags" type="text" placeholder="主线, 伏笔"></label>
+                            <label><span>关联章节</span>
+                                <select id="outline-node-chapter">
+                                    <option value="">未关联</option>
+                                </select>
+                            </label>
+                            <div class="outline-inline-actions">
+                                <button type="button" id="outline-open-chapter" class="button secondary">跳转章节</button>
+                                <button type="button" id="outline-create-chapter-bind" class="button secondary">新建章节并绑定</button>
+                            </div>
+                            <label><span>关联人物</span>
+                                <select id="outline-node-character">
+                                    <option value="">未关联</option>
+                                </select>
+                            </label>
+                        </form>
+
+                        <form id="outline-edge-form" class="stack-form" hidden>
+                            <label><span>线条颜色</span><input id="outline-edge-color" type="color" value="#ef4444"></label>
+                            <label><span>线型</span>
+                                <select id="outline-edge-style">
+                                    <option value="solid">实线</option>
+                                    <option value="dashed">虚线</option>
+                                    <option value="dotted">点线</option>
+                                </select>
+                            </label>
+                            <label><span>粗细</span>
+                                <select id="outline-edge-width">
+                                    <option value="1">1px</option>
+                                    <option value="2" selected>2px</option>
+                                    <option value="3">3px</option>
+                                </select>
+                            </label>
+                            <label><span>箭头</span>
+                                <select id="outline-edge-arrow">
+                                    <option value="forward">有向</option>
+                                    <option value="none">无向</option>
+                                    <option value="both">双向</option>
+                                </select>
+                            </label>
+                            <label><span>标签</span><input id="outline-edge-label" type="text" maxlength="40" placeholder="导致 / 启发 / 同时发生"></label>
+                        </form>
+                    </section>
+
+                    <section class="outline-card">
+                        <div class="outline-card-head">
+                            <h3>线段图例</h3>
+                            <button type="button" id="outline-add-legend" class="button secondary">+ 图例</button>
+                        </div>
+                        <div id="outline-legend-list" class="outline-legend-list"></div>
+                    </section>
+
+                    <section class="outline-card">
+                        <h3>状态</h3>
+                        <p id="outline-status" class="text-muted">准备就绪</p>
+                    </section>
+                </aside>
+            </div>
         </section>
         {% elif module == 'characters' %}
         <section class="workspace-panel">
-            <h1>人物</h1>
-            <p class="lead">已切换为工作区内人物模块。后续可以扩展卡片墙、详情抽屉与关系图谱。</p>
+            <div class="character-toolbar">
+                <div>
+                    <h1>人物</h1>
+                    <p class="lead">卡片墙 + 详情抽屉。支持搜索、标签过滤、星标筛选与自定义排序。</p>
+                </div>
+                <div class="character-toolbar-actions">
+                    <input id="char-search" type="search" placeholder="搜索姓名、别名、描述...">
+                    <button type="button" id="char-star-filter" class="button secondary">只看书签</button>
+                    <button type="button" id="char-create-btn" class="button primary">+ 新建人物</button>
+                </div>
+            </div>
+
+            <div id="char-tags" class="character-tag-bar"></div>
+
+            <div id="char-grid" class="character-grid" aria-live="polite"></div>
+
+            <aside id="char-drawer" class="character-drawer" hidden>
+                <header class="character-drawer-head">
+                    <div>
+                        <button type="button" id="char-drawer-close-left" class="icon-btn small" title="返回">←</button>
+                        <span id="char-drawer-title">人物档案</span>
+                    </div>
+                    <div class="character-drawer-head-actions">
+                        <button type="button" id="char-drawer-star" class="icon-btn small" title="星标">★</button>
+                        <button type="button" id="char-drawer-close" class="icon-btn small" title="关闭">×</button>
+                    </div>
+                </header>
+                <form id="char-form" class="stack-form character-drawer-body">
+                    <section class="character-form-section">
+                        <h3>基本信息</h3>
+                        <div class="character-avatar-row">
+                            <div id="char-avatar-preview" class="character-avatar-lg">#</div>
+                            <div>
+                                <label class="button secondary" for="char-avatar-input">上传头像</label>
+                                <input id="char-avatar-input" type="file" accept="image/*" hidden>
+                            </div>
+                        </div>
+                        <label><span>姓名</span><input id="char-name" type="text" maxlength="120" required></label>
+                        <label><span>身份/职业</span><input id="char-role" type="text" maxlength="120" placeholder="例如：面壁者、警察、AI"></label>
+                        <div class="character-inline-fields">
+                            <label><span>性别</span><input id="char-gender" type="text" maxlength="20"></label>
+                            <label><span>年龄</span><input id="char-age" type="text" maxlength="40" placeholder="32岁（危机纪元）"></label>
+                        </div>
+                        <label><span>别名（逗号分隔）</span><input id="char-aliases" type="text" placeholder="面壁者, 执剑人"></label>
+                        <label><span>标签（逗号分隔）</span><input id="char-tags-input" type="text" placeholder="主角, 面壁计划"></label>
+                        <label><span>一句话简介</span><input id="char-summary" type="text" maxlength="240"></label>
+                    </section>
+
+                    <section class="character-form-section">
+                        <div class="character-markdown-head">
+                            <h3>外貌与性格描述（Markdown）</h3>
+                            <div class="character-markdown-head-actions">
+                                <button type="button" id="char-description-preview-toggle" class="button secondary">查看预览</button>
+                                <button type="button" id="char-description-expand" class="button secondary">展开编辑器</button>
+                            </div>
+                        </div>
+                        <textarea id="char-description" rows="6"></textarea>
+                        <article id="char-description-inline-preview" class="character-inline-preview" hidden></article>
+                    </section>
+
+                    <section class="character-form-section">
+                        <h3>人物关系</h3>
+                        <div id="char-relation-list" class="character-relation-list"></div>
+                        <button type="button" id="char-add-relation" class="button secondary">+ 添加关系</button>
+                    </section>
+
+                    <section class="character-form-section">
+                        <h3>出场章节记录</h3>
+                        <div id="char-mentions" class="character-mentions-list text-muted">暂无记录</div>
+                    </section>
+
+                    <section class="character-form-section">
+                        <h3>自由备注（Markdown）</h3>
+                        <textarea id="char-notes" rows="6"></textarea>
+                    </section>
+
+                    <div class="form-actions">
+                        <button type="button" id="char-cancel" class="button secondary">取消</button>
+                        <button type="submit" class="button primary">保存更改</button>
+                        <span id="char-form-message" class="form-message"></span>
+                    </div>
+                </form>
+            </aside>
+
+            <div id="char-context-menu" class="character-context-menu" hidden>
+                <button type="button" data-action="edit">编辑</button>
+                <button type="button" data-action="copy">复制关联链接</button>
+                <button type="button" data-action="pin">置顶/取消置顶</button>
+                <button type="button" data-action="delete" class="danger">删除</button>
+            </div>
+
+            <div id="char-md-modal" class="character-md-modal" hidden>
+                <div class="character-md-backdrop" id="char-md-backdrop"></div>
+                <section class="character-md-dialog" role="dialog" aria-modal="true" aria-label="外貌与性格描述编辑器">
+                    <header class="character-md-header">
+                        <h3>外貌与性格描述 · Markdown 编辑器</h3>
+                        <button type="button" id="char-md-close" class="icon-btn small" title="关闭">×</button>
+                    </header>
+
+                    <div class="character-md-toolbar">
+                        <div class="character-md-mode-switch">
+                            <button type="button" class="active" data-md-mode="split">分栏</button>
+                            <button type="button" data-md-mode="edit">编辑</button>
+                            <button type="button" data-md-mode="preview">预览</button>
+                        </div>
+                        <div class="character-md-insert-tools">
+                            <button type="button" data-md-wrap="**|**" title="加粗">B</button>
+                            <button type="button" data-md-wrap="*|*" title="斜体">I</button>
+                            <button type="button" data-md-prefix="## " title="二级标题">H2</button>
+                            <button type="button" data-md-prefix="> " title="引用">❝</button>
+                            <button type="button" data-md-prefix="- " title="列表">•</button>
+                            <button type="button" data-md-wrap="[文本](|)" title="链接">🔗</button>
+                        </div>
+                    </div>
+
+                    <div class="character-md-body md-mode-split" id="char-md-body">
+                        <textarea id="char-md-editor" class="character-md-editor" placeholder="在这里编辑角色的外貌与性格描述..." spellcheck="false"></textarea>
+                        <article id="char-md-preview" class="character-md-preview"></article>
+                    </div>
+
+                    <footer class="character-md-footer">
+                        <button type="button" id="char-md-cancel" class="button secondary">取消</button>
+                        <button type="button" id="char-md-apply" class="button primary">应用到表单</button>
+                    </footer>
+                </section>
+            </div>
         </section>
         {% elif module == 'worldbuilding' %}
         <section class="workspace-panel">
@@ -69,7 +320,99 @@
         {% elif module == 'appearance' %}
         <section class="workspace-panel">
             <h1>外观定制</h1>
-            <p class="lead">该入口已经绑定到工作区。后续可接入可视化装修器，实时预览当前工作区章节。</p>
+            <p class="lead">配置当前工作区的阅读主题：背景色、背景图、滚动模式、透明度、链接色、正文字体与段落间距。保存后会应用到阅读页。</p>
+
+            <div class="workspace-settings-grid appearance-grid">
+                <form id="workspace-appearance-form" class="stack-form workspace-settings-form workspace-appearance-form">
+                    <label>
+                        <span>页面背景色</span>
+                        <div class="appearance-input-inline">
+                            <input id="appearance-bg-color" type="color" value="{{ theme_config.page_bg_color|default:'#fffaf2' }}">
+                            <input id="appearance-bg-color-text" type="text" value="{{ theme_config.page_bg_color|default:'#fffaf2' }}" maxlength="32" placeholder="#fffaf2">
+                        </div>
+                    </label>
+
+                    <label>
+                        <span>背景图片</span>
+                        <div class="appearance-bg-upload">
+                            <div id="appearance-bg-thumb" class="appearance-bg-thumb{% if not theme_config or not theme_config.background_image %} empty{% endif %}">
+                                {% if theme_config and theme_config.background_image %}
+                                <img id="appearance-bg-thumb-img" src="{{ theme_config.background_image.url }}" alt="背景预览">
+                                {% else %}
+                                <img id="appearance-bg-thumb-img" src="" alt="背景预览" hidden>
+                                <span id="appearance-bg-thumb-empty">未设置背景图</span>
+                                {% endif %}
+                            </div>
+                            <div class="workspace-icon-actions">
+                                <label class="button secondary" for="appearance-bg-image">上传背景图</label>
+                                <input id="appearance-bg-image" type="file" accept="image/*" hidden>
+                                <button type="button" id="appearance-bg-clear" class="button secondary">移除背景图</button>
+                                <p class="text-muted">支持 JPG/PNG/WebP 等格式，建议小于 12MB。</p>
+                            </div>
+                        </div>
+                    </label>
+
+                    <label>
+                        <span>背景模式</span>
+                        <select id="appearance-bg-mode">
+                            <option value="scroll_tile" {% if theme_config and theme_config.background_mode == 'scroll_tile' %}selected{% endif %}>随页面滚动并无限平铺</option>
+                            <option value="fixed_cover" {% if theme_config and theme_config.background_mode == 'fixed_cover' %}selected{% endif %}>静止在背景（固定）</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>背景透明度 <strong id="appearance-opacity-value">{{ theme_config.background_opacity|default:'0.22' }}</strong></span>
+                        <input id="appearance-bg-opacity" type="range" min="0" max="1" step="0.05" value="{{ theme_config.background_opacity|default:'0.22' }}">
+                        <p class="text-muted">0 为完全透明，1 为完全不透明。</p>
+                    </label>
+
+                    <label>
+                        <span>正文主字体</span>
+                        <select id="appearance-font-family">
+                            {% for value, label in theme_font_choices %}
+                            <option value="{{ value }}" {% if theme_config and theme_config.text_font_family == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>链接强调色</span>
+                        <div class="appearance-input-inline">
+                            <input id="appearance-link-color" type="color" value="{{ theme_config.link_color|default:'#16324f' }}">
+                            <input id="appearance-link-color-text" type="text" value="{{ theme_config.link_color|default:'#16324f' }}" maxlength="32" placeholder="#16324f">
+                        </div>
+                    </label>
+
+                    <label>
+                        <span>段落间距 <strong id="appearance-spacing-value">{{ theme_config.paragraph_spacing|default:'1rem' }}</strong></span>
+                        <input id="appearance-paragraph-spacing" type="range" min="0" max="4" step="0.1" value="{{ theme_config.paragraph_spacing|default:'1rem'|cut:'rem'|cut:'px' }}">
+                        <p class="text-muted">范围 0 - 4，单位 rem。</p>
+                    </label>
+
+                    <div class="form-actions">
+                        <button type="submit" class="button primary">保存外观</button>
+                        <button type="button" class="button secondary" id="appearance-reset-btn">恢复默认</button>
+                        <span id="workspace-appearance-message" class="form-message"></span>
+                    </div>
+                </form>
+
+                <aside class="workspace-settings-side appearance-preview-side">
+                    <div class="workspace-card workspace-settings-meta">
+                        <p><strong>应用范围：</strong>当前工作区阅读页</p>
+                        <p><strong>工作区：</strong>{{ workspace.title }}</p>
+                        <p><strong>预设：</strong>安全标准样式（无需审核）</p>
+                    </div>
+
+                    <div id="appearance-preview" class="workspace-card appearance-preview-card">
+                        <div class="appearance-preview-bg" id="appearance-preview-bg"></div>
+                        <p class="appearance-preview-eyebrow">实时预览</p>
+                        <h3>夜雨旧桥</h3>
+                        <p>雨落在青瓦上的声音，像谁在旧纸背面轻轻誊写你的名字。</p>
+                        <p>他抬眼看见桥头那盏灯，忽明忽暗，像一段还没说完的话。</p>
+                        <a href="#" onclick="return false;">查看批注与注释</a>
+                    </div>
+                </aside>
+            </div>
         </section>
         {% elif module == 'settings' %}
         <section class="workspace-panel">
@@ -317,6 +660,1014 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+});
+</script>
+{% endif %}
+
+{% if module == 'outline' %}
+{{ outline_canvas|json_script:"outline-initial-data" }}
+<script src="{% static 'js/outline.js' %}"></script>
+{% endif %}
+
+{% if module == 'characters' %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const workspaceId = Number('{{ workspace.id }}');
+    const searchInput = document.getElementById('char-search');
+    const starFilterBtn = document.getElementById('char-star-filter');
+    const createBtn = document.getElementById('char-create-btn');
+    const grid = document.getElementById('char-grid');
+    const tagsBar = document.getElementById('char-tags');
+
+    const drawer = document.getElementById('char-drawer');
+    const drawerTitle = document.getElementById('char-drawer-title');
+    const drawerStarBtn = document.getElementById('char-drawer-star');
+    const drawerCloseBtn = document.getElementById('char-drawer-close');
+    const drawerCloseLeftBtn = document.getElementById('char-drawer-close-left');
+    const form = document.getElementById('char-form');
+    const formMessage = document.getElementById('char-form-message');
+
+    const avatarPreview = document.getElementById('char-avatar-preview');
+    const avatarInput = document.getElementById('char-avatar-input');
+    const nameInput = document.getElementById('char-name');
+    const roleInput = document.getElementById('char-role');
+    const genderInput = document.getElementById('char-gender');
+    const ageInput = document.getElementById('char-age');
+    const aliasesInput = document.getElementById('char-aliases');
+    const tagsInput = document.getElementById('char-tags-input');
+    const summaryInput = document.getElementById('char-summary');
+    const descriptionInput = document.getElementById('char-description');
+    const descriptionPreviewToggleBtn = document.getElementById('char-description-preview-toggle');
+    const descriptionExpandBtn = document.getElementById('char-description-expand');
+    const descriptionInlinePreview = document.getElementById('char-description-inline-preview');
+    const notesInput = document.getElementById('char-notes');
+    const relationList = document.getElementById('char-relation-list');
+    const addRelationBtn = document.getElementById('char-add-relation');
+    const mentionsNode = document.getElementById('char-mentions');
+    const cancelBtn = document.getElementById('char-cancel');
+
+    const mdModal = document.getElementById('char-md-modal');
+    const mdBackdrop = document.getElementById('char-md-backdrop');
+    const mdCloseBtn = document.getElementById('char-md-close');
+    const mdCancelBtn = document.getElementById('char-md-cancel');
+    const mdApplyBtn = document.getElementById('char-md-apply');
+    const mdBody = document.getElementById('char-md-body');
+    const mdEditor = document.getElementById('char-md-editor');
+    const mdPreview = document.getElementById('char-md-preview');
+
+    const contextMenu = document.getElementById('char-context-menu');
+
+    if (!grid || !form || !nameInput) {
+        return;
+    }
+
+    const presetTags = ['全部', '主角', '配角', '组织', '已领便当'];
+    let characters = [];
+    let activeTag = '全部';
+    let starredOnly = false;
+    let keyword = '';
+    let currentId = null;
+    let pendingAvatarFile = null;
+    let pendingAvatarPreviewUrl = '';
+    let contextCharacterId = null;
+    let dragSourceId = null;
+    let inlinePreviewVisible = false;
+    let mdPreviewDebounceTimer = null;
+
+    const parseList = (text) => String(text || '').split(',').map((item) => item.trim()).filter(Boolean);
+
+    const escapeHtml = (value) => String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
+    const setFormMessage = (text, isError = false) => {
+        if (!formMessage) return;
+        formMessage.textContent = text || '';
+        formMessage.style.color = isError ? '#b42318' : '';
+    };
+
+    const setAvatarPreview = (url, fallbackName = '') => {
+        if (url) {
+            avatarPreview.innerHTML = `<img src="${url}" alt="头像">`;
+            return;
+        }
+        avatarPreview.textContent = (fallbackName || '#').slice(0, 1).toUpperCase();
+    };
+
+    const uploadAvatarForCharacter = async (characterId, file) => {
+        if (!characterId || !file) return null;
+        const formData = new FormData();
+        formData.append('avatar', file);
+        const data = await fetchJson(`/api/characters/${characterId}/upload_avatar/`, {
+            method: 'POST',
+            body: formData,
+        });
+        return data.avatar_url || '';
+    };
+
+    const fetchJson = async (url, init = {}) => {
+        const response = typeof fetchWithAuthRetry === 'function'
+            ? await fetchWithAuthRetry(url, init)
+            : await fetch(url, init);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(data.detail || '请求失败');
+        }
+        return data;
+    };
+
+    const renderMarkdownPreview = async (markdownText, targetNode) => {
+        if (!targetNode) return;
+        const content = String(markdownText || '').trim();
+        if (!content) {
+            targetNode.innerHTML = '<p class="text-muted">暂无内容</p>';
+            return;
+        }
+
+        try {
+            const payload = await fetchJson('/api/chapters/render_preview/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    content_md: content,
+                    novel: workspaceId,
+                }),
+            });
+            targetNode.innerHTML = payload.html || '<p class="text-muted">暂无内容</p>';
+        } catch {
+            targetNode.innerHTML = `<pre>${escapeHtml(content)}</pre>`;
+        }
+    };
+
+    const scheduleModalPreviewRender = () => {
+        if (!mdEditor || !mdPreview) return;
+        if (mdPreviewDebounceTimer) {
+            clearTimeout(mdPreviewDebounceTimer);
+        }
+        mdPreviewDebounceTimer = setTimeout(() => {
+            renderMarkdownPreview(mdEditor.value, mdPreview);
+        }, 150);
+    };
+
+    const setMdMode = (mode) => {
+        if (!mdBody) return;
+        const next = mode === 'edit' || mode === 'preview' ? mode : 'split';
+        mdBody.classList.remove('md-mode-edit', 'md-mode-preview', 'md-mode-split');
+        mdBody.classList.add(`md-mode-${next}`);
+
+        const modeBtns = mdModal ? mdModal.querySelectorAll('[data-md-mode]') : [];
+        modeBtns.forEach((btn) => {
+            btn.classList.toggle('active', btn.dataset.mdMode === next);
+        });
+    };
+
+    const openMdModal = async () => {
+        if (!mdModal || !mdEditor) return;
+        mdEditor.value = descriptionInput.value || '';
+        mdModal.hidden = false;
+        setMdMode('split');
+        await renderMarkdownPreview(mdEditor.value, mdPreview);
+        mdEditor.focus();
+    };
+
+    const closeMdModal = () => {
+        if (!mdModal) return;
+        mdModal.hidden = true;
+    };
+
+    const applyMdModal = () => {
+        if (!mdEditor) return;
+        descriptionInput.value = mdEditor.value;
+        closeMdModal();
+        if (inlinePreviewVisible) {
+            renderMarkdownPreview(descriptionInput.value, descriptionInlinePreview);
+        }
+    };
+
+    const insertIntoMdEditor = (prefix, suffix = '') => {
+        if (!mdEditor) return;
+        const start = mdEditor.selectionStart;
+        const end = mdEditor.selectionEnd;
+        const selected = mdEditor.value.slice(start, end);
+        const insertText = `${prefix}${selected}${suffix}`;
+        mdEditor.value = `${mdEditor.value.slice(0, start)}${insertText}${mdEditor.value.slice(end)}`;
+
+        const nextPos = selected ? start + insertText.length : start + prefix.length;
+        mdEditor.selectionStart = nextPos;
+        mdEditor.selectionEnd = nextPos;
+        mdEditor.focus();
+        scheduleModalPreviewRender();
+    };
+
+    const collectAllTags = () => {
+        const dynamicTags = new Set();
+        characters.forEach((item) => (item.tags || []).forEach((tag) => dynamicTags.add(tag)));
+        return [...new Set([...presetTags, ...Array.from(dynamicTags)])];
+    };
+
+    const buildQuery = () => {
+        const params = new URLSearchParams();
+        params.set('novel', String(workspaceId));
+        if (keyword.trim()) params.set('q', keyword.trim());
+        if (starredOnly) params.set('starred', '1');
+        if (activeTag && activeTag !== '全部') params.set('tag', activeTag);
+        return params.toString();
+    };
+
+    const loadCharacters = async () => {
+        const data = await fetchJson(`/api/characters/?${buildQuery()}`);
+        characters = Array.isArray(data) ? data : (data.results || []);
+        renderTagBar();
+        renderGrid();
+    };
+
+    const avatarMarkup = (item) => {
+        if (item.avatar_url) {
+            return `<img src="${item.avatar_url}" alt="${item.name}">`;
+        }
+        const initial = (item.name || '#').slice(0, 1).toUpperCase();
+        return `<span>${initial}</span>`;
+    };
+
+    const renderTagBar = () => {
+        const tags = collectAllTags();
+        tagsBar.innerHTML = tags.map((tag) => `
+            <button type="button" class="character-tag-chip ${tag === activeTag ? 'active' : ''}" data-tag="${tag}">${tag}</button>
+        `).join('');
+    };
+
+    const canDrag = () => !keyword.trim() && !starredOnly && activeTag === '全部';
+
+    const renderGrid = () => {
+        const cards = characters.map((item) => `
+            <article class="character-card" data-id="${item.id}" ${canDrag() ? 'draggable="true"' : ''}>
+                <button type="button" class="character-card-star ${item.is_starred ? 'active' : ''}" data-action="star" title="书签">★</button>
+                <div class="character-avatar">${avatarMarkup(item)}</div>
+                <h3>${item.name}</h3>
+                <p class="character-role">${item.role_title || item.summary || '未填写身份'}</p>
+                <p class="character-meta">出场：${item.appearances_count || 0} 章</p>
+                <div class="character-quick-actions">
+                    <button type="button" data-action="edit">📝 编辑</button>
+                    <button type="button" data-action="copy">🔗 复制链接</button>
+                    <button type="button" data-action="delete" class="danger">🗑️ 删除</button>
+                </div>
+            </article>
+        `).join('');
+
+        grid.innerHTML = `${cards}
+            <button type="button" id="char-new-card" class="character-create-card">+ 新建人物</button>
+        `;
+    };
+
+    const openDrawer = (item = null) => {
+        drawer.hidden = false;
+        currentId = item ? item.id : null;
+        pendingAvatarFile = null;
+        pendingAvatarPreviewUrl = '';
+        drawerTitle.textContent = item ? `${item.name} · 人物档案` : '新建人物';
+        drawerStarBtn.classList.toggle('active', Boolean(item && item.is_starred));
+
+        nameInput.value = item?.name || '';
+        roleInput.value = item?.role_title || '';
+        genderInput.value = item?.gender || '';
+        ageInput.value = item?.age_label || '';
+        aliasesInput.value = (item?.aliases || []).join(', ');
+        tagsInput.value = (item?.tags || []).join(', ');
+        summaryInput.value = item?.summary || '';
+        descriptionInput.value = item?.description || '';
+        notesInput.value = item?.notes || '';
+
+        if (descriptionInlinePreview) {
+            descriptionInlinePreview.hidden = true;
+        }
+        if (descriptionPreviewToggleBtn) {
+            descriptionPreviewToggleBtn.textContent = '查看预览';
+        }
+        inlinePreviewVisible = false;
+
+        const avatarUrl = item?.avatar_url || '';
+        setAvatarPreview(avatarUrl, item?.name || '');
+
+        renderRelations(item?.relationships || []);
+        renderMentions(item?.mention_chapters || []);
+        setFormMessage('');
+    };
+
+    const closeDrawer = () => {
+        drawer.hidden = true;
+        currentId = null;
+    };
+
+    const renderRelationRow = (row = {}) => {
+        const options = characters
+            .filter((item) => item.id !== currentId)
+            .map((item) => `<option value="${item.id}" ${String(row.target_id || '') === String(item.id) ? 'selected' : ''}>${item.name}</option>`)
+            .join('');
+        return `
+            <div class="character-relation-row">
+                <select class="char-rel-target">
+                    <option value="">选择人物</option>
+                    ${options}
+                </select>
+                <input type="text" class="char-rel-type" placeholder="关系类型（友人/敌对/从属）" value="${row.relation_type || ''}">
+                <button type="button" class="char-rel-remove">×</button>
+            </div>
+        `;
+    };
+
+    const renderRelations = (rows) => {
+        relationList.innerHTML = (rows || []).map((row) => renderRelationRow(row)).join('');
+        if (!relationList.innerHTML) {
+            relationList.innerHTML = '<p class="text-muted">暂无关系，点击下方按钮添加。</p>';
+        }
+    };
+
+    const collectRelations = () => {
+        const rows = relationList.querySelectorAll('.character-relation-row');
+        const result = [];
+        rows.forEach((row) => {
+            const target = row.querySelector('.char-rel-target')?.value;
+            const type = row.querySelector('.char-rel-type')?.value?.trim();
+            if (!target || !type) return;
+            result.push({
+                target_id: Number(target),
+                relation_type: type,
+                mutual: true,
+            });
+        });
+        return result;
+    };
+
+    const renderMentions = (mentions) => {
+        if (!mentions || !mentions.length) {
+            mentionsNode.innerHTML = '暂无记录';
+            return;
+        }
+        mentionsNode.innerHTML = mentions.map((item) => `
+            <a class="character-mention-item" href="/workspace/${workspaceId}/writing/?chapter_id=${item.chapter_id}" target="_blank">
+                第 ${item.chapter_order} 章 · ${item.chapter_title}
+            </a>
+        `).join('');
+    };
+
+    const saveCharacter = async () => {
+        const name = nameInput.value.trim();
+        if (!name) {
+            setFormMessage('姓名不能为空', true);
+            return;
+        }
+
+        const payload = {
+            novel: workspaceId,
+            name,
+            role_title: roleInput.value.trim(),
+            gender: genderInput.value.trim(),
+            age_label: ageInput.value.trim(),
+            aliases: parseList(aliasesInput.value),
+            tags: parseList(tagsInput.value),
+            summary: summaryInput.value.trim(),
+            description: descriptionInput.value,
+            notes: notesInput.value,
+            relationships: collectRelations(),
+        };
+
+        const request = {
+            method: currentId ? 'PATCH' : 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+        };
+
+        const url = currentId ? `/api/characters/${currentId}/` : '/api/characters/';
+        setFormMessage('保存中...');
+        const saved = await fetchJson(url, request);
+
+        const savedId = Number(saved?.id || currentId || 0) || null;
+        if (savedId && pendingAvatarFile) {
+            setFormMessage('保存成功，正在上传头像...');
+            await uploadAvatarForCharacter(savedId, pendingAvatarFile);
+            pendingAvatarFile = null;
+            if (pendingAvatarPreviewUrl) {
+                URL.revokeObjectURL(pendingAvatarPreviewUrl);
+                pendingAvatarPreviewUrl = '';
+            }
+        }
+
+        setFormMessage('已保存');
+        await loadCharacters();
+
+        if (savedId) {
+            currentId = savedId;
+        }
+
+        if (currentId) {
+            const next = characters.find((item) => item.id === currentId);
+            if (next) openDrawer(next);
+        } else {
+            closeDrawer();
+        }
+    };
+
+    const toggleStar = async (id, nextValue = null) => {
+        const target = characters.find((item) => item.id === id);
+        if (!target) return;
+        const isStarred = nextValue === null ? !target.is_starred : !!nextValue;
+        await fetchJson(`/api/characters/${id}/`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({is_starred: isStarred}),
+        });
+        await loadCharacters();
+        if (currentId === id) {
+            const next = characters.find((item) => item.id === id);
+            if (next) openDrawer(next);
+        }
+    };
+
+    const deleteCharacter = async (id) => {
+        const target = characters.find((item) => item.id === id);
+        if (!target) return;
+        const ok = window.confirm(`确认删除人物「${target.name}」吗？`);
+        if (!ok) return;
+        await fetchJson(`/api/characters/${id}/`, {method: 'DELETE'});
+        if (currentId === id) closeDrawer();
+        await loadCharacters();
+    };
+
+    const copyCharacterLink = async (id) => {
+        const link = `${window.location.origin}/workspace/${workspaceId}/characters/?character_id=${id}`;
+        try {
+            await navigator.clipboard.writeText(link);
+            setFormMessage('人物链接已复制');
+        } catch {
+            window.prompt('复制链接：', link);
+        }
+    };
+
+    const reorderCharacters = async () => {
+        const ids = Array.from(grid.querySelectorAll('.character-card')).map((node) => Number(node.dataset.id));
+        await fetchJson('/api/characters/reorder/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ids}),
+        });
+        await loadCharacters();
+    };
+
+    tagsBar.addEventListener('click', (event) => {
+        const chip = event.target.closest('[data-tag]');
+        if (!chip) return;
+        activeTag = chip.dataset.tag || '全部';
+        loadCharacters();
+    });
+
+    if (searchInput) {
+        let timer = null;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                keyword = searchInput.value || '';
+                loadCharacters();
+            }, 220);
+        });
+    }
+
+    if (starFilterBtn) {
+        starFilterBtn.addEventListener('click', () => {
+            starredOnly = !starredOnly;
+            starFilterBtn.classList.toggle('active', starredOnly);
+            loadCharacters();
+        });
+    }
+
+    if (createBtn) createBtn.addEventListener('click', () => openDrawer(null));
+
+    grid.addEventListener('click', async (event) => {
+        const newCard = event.target.closest('#char-new-card');
+        if (newCard) {
+            openDrawer(null);
+            return;
+        }
+
+        const card = event.target.closest('.character-card');
+        if (!card) return;
+        const id = Number(card.dataset.id);
+        const actionBtn = event.target.closest('[data-action]');
+
+        if (actionBtn) {
+            const action = actionBtn.dataset.action;
+            if (action === 'edit') {
+                const target = characters.find((item) => item.id === id);
+                if (target) openDrawer(target);
+            } else if (action === 'delete') {
+                deleteCharacter(id);
+            } else if (action === 'copy') {
+                copyCharacterLink(id);
+            } else if (action === 'star') {
+                toggleStar(id);
+            }
+            return;
+        }
+
+        const target = characters.find((item) => item.id === id);
+        if (target) openDrawer(target);
+    });
+
+    grid.addEventListener('contextmenu', (event) => {
+        const card = event.target.closest('.character-card');
+        if (!card) return;
+        event.preventDefault();
+        contextCharacterId = Number(card.dataset.id);
+        contextMenu.hidden = false;
+        contextMenu.style.left = `${event.clientX}px`;
+        contextMenu.style.top = `${event.clientY}px`;
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!contextMenu.contains(event.target)) {
+            contextMenu.hidden = true;
+        }
+    });
+
+    contextMenu.addEventListener('click', (event) => {
+        const btn = event.target.closest('[data-action]');
+        if (!btn || !contextCharacterId) return;
+        const action = btn.dataset.action;
+        if (action === 'edit') {
+            const target = characters.find((item) => item.id === contextCharacterId);
+            if (target) openDrawer(target);
+        } else if (action === 'copy') {
+            copyCharacterLink(contextCharacterId);
+        } else if (action === 'delete') {
+            deleteCharacter(contextCharacterId);
+        } else if (action === 'pin') {
+            const target = characters.find((item) => item.id === contextCharacterId);
+            if (target) {
+                fetchJson(`/api/characters/${contextCharacterId}/`, {
+                    method: 'PATCH',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({is_pinned: !target.is_pinned}),
+                }).then(loadCharacters);
+            }
+        }
+        contextMenu.hidden = true;
+    });
+
+    grid.addEventListener('dragstart', (event) => {
+        if (!canDrag()) {
+            event.preventDefault();
+            return;
+        }
+        const card = event.target.closest('.character-card');
+        if (!card) return;
+        dragSourceId = Number(card.dataset.id);
+        event.dataTransfer.effectAllowed = 'move';
+    });
+
+    grid.addEventListener('dragover', (event) => {
+        if (!canDrag() || !dragSourceId) return;
+        event.preventDefault();
+    });
+
+    grid.addEventListener('drop', (event) => {
+        if (!canDrag()) return;
+        const targetCard = event.target.closest('.character-card');
+        if (!targetCard || !dragSourceId) return;
+        event.preventDefault();
+        const targetId = Number(targetCard.dataset.id);
+        if (targetId === dragSourceId) return;
+
+        const sourceNode = grid.querySelector(`.character-card[data-id="${dragSourceId}"]`);
+        if (!sourceNode) return;
+        grid.insertBefore(sourceNode, targetCard);
+        reorderCharacters();
+        dragSourceId = null;
+    });
+
+    if (addRelationBtn) {
+        addRelationBtn.addEventListener('click', () => {
+            if (relationList.querySelector('.text-muted')) {
+                relationList.innerHTML = '';
+            }
+            relationList.insertAdjacentHTML('beforeend', renderRelationRow());
+        });
+    }
+
+    relationList.addEventListener('click', (event) => {
+        const btn = event.target.closest('.char-rel-remove');
+        if (!btn) return;
+        btn.closest('.character-relation-row')?.remove();
+        if (!relationList.querySelector('.character-relation-row')) {
+            relationList.innerHTML = '<p class="text-muted">暂无关系，点击下方按钮添加。</p>';
+        }
+    });
+
+    if (descriptionPreviewToggleBtn && descriptionInlinePreview) {
+        descriptionPreviewToggleBtn.addEventListener('click', async () => {
+            inlinePreviewVisible = !inlinePreviewVisible;
+            descriptionInlinePreview.hidden = !inlinePreviewVisible;
+            descriptionPreviewToggleBtn.textContent = inlinePreviewVisible ? '隐藏预览' : '查看预览';
+            if (inlinePreviewVisible) {
+                await renderMarkdownPreview(descriptionInput.value, descriptionInlinePreview);
+            }
+        });
+    }
+
+    if (descriptionExpandBtn) {
+        descriptionExpandBtn.addEventListener('click', () => {
+            openMdModal();
+        });
+    }
+
+    if (mdEditor) {
+        mdEditor.addEventListener('input', scheduleModalPreviewRender);
+    }
+
+    if (mdModal) {
+        mdModal.querySelectorAll('[data-md-mode]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                setMdMode(btn.dataset.mdMode || 'split');
+            });
+        });
+
+        mdModal.querySelectorAll('[data-md-wrap]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const [prefix, suffix] = String(btn.dataset.mdWrap || '').split('|');
+                insertIntoMdEditor(prefix || '', suffix || '');
+            });
+        });
+
+        mdModal.querySelectorAll('[data-md-prefix]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                insertIntoMdEditor(btn.dataset.mdPrefix || '', '');
+            });
+        });
+    }
+
+    if (mdApplyBtn) mdApplyBtn.addEventListener('click', applyMdModal);
+    if (mdCancelBtn) mdCancelBtn.addEventListener('click', closeMdModal);
+    if (mdCloseBtn) mdCloseBtn.addEventListener('click', closeMdModal);
+    if (mdBackdrop) mdBackdrop.addEventListener('click', closeMdModal);
+
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        saveCharacter().catch((error) => setFormMessage(error.message || '保存失败', true));
+    });
+
+    if (avatarInput) {
+        avatarInput.addEventListener('change', async (event) => {
+            const file = event.target.files && event.target.files[0];
+            if (!file) {
+                avatarInput.value = '';
+                return;
+            }
+
+            if (pendingAvatarPreviewUrl) {
+                URL.revokeObjectURL(pendingAvatarPreviewUrl);
+                pendingAvatarPreviewUrl = '';
+            }
+
+            pendingAvatarFile = file;
+            pendingAvatarPreviewUrl = URL.createObjectURL(file);
+            setAvatarPreview(pendingAvatarPreviewUrl, nameInput.value.trim());
+
+            try {
+                if (currentId) {
+                    setFormMessage('头像上传中...');
+                    const avatarUrl = await uploadAvatarForCharacter(currentId, file);
+                    if (avatarUrl) {
+                        setAvatarPreview(avatarUrl, nameInput.value.trim());
+                    }
+                    pendingAvatarFile = null;
+                    if (pendingAvatarPreviewUrl) {
+                        URL.revokeObjectURL(pendingAvatarPreviewUrl);
+                        pendingAvatarPreviewUrl = '';
+                    }
+                    await loadCharacters();
+                    setFormMessage('头像已更新');
+                } else {
+                    setFormMessage('头像将在保存人物后上传');
+                }
+            } catch (error) {
+                setFormMessage(error.message || '头像上传失败', true);
+            } finally {
+                avatarInput.value = '';
+            }
+        });
+    }
+
+    if (drawerStarBtn) {
+        drawerStarBtn.addEventListener('click', () => {
+            if (!currentId) return;
+            toggleStar(currentId);
+        });
+    }
+
+    if (cancelBtn) cancelBtn.addEventListener('click', closeDrawer);
+    if (drawerCloseBtn) drawerCloseBtn.addEventListener('click', closeDrawer);
+    if (drawerCloseLeftBtn) drawerCloseLeftBtn.addEventListener('click', closeDrawer);
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            if (mdModal && !mdModal.hidden) {
+                closeMdModal();
+                return;
+            }
+            closeDrawer();
+            contextMenu.hidden = true;
+        }
+    });
+
+    const requestedId = Number(new URLSearchParams(window.location.search).get('character_id'));
+    loadCharacters().then(() => {
+        if (requestedId) {
+            const target = characters.find((item) => item.id === requestedId);
+            if (target) openDrawer(target);
+        }
+    }).catch((error) => {
+        grid.innerHTML = `<p class="text-muted">加载失败：${error.message || '未知错误'}</p>`;
+    });
+});
+</script>
+{% endif %}
+
+{% if module == 'appearance' %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('workspace-appearance-form');
+    const bgColor = document.getElementById('appearance-bg-color');
+    const bgColorText = document.getElementById('appearance-bg-color-text');
+    const fontFamily = document.getElementById('appearance-font-family');
+    const linkColor = document.getElementById('appearance-link-color');
+    const linkColorText = document.getElementById('appearance-link-color-text');
+    const paragraphSpacing = document.getElementById('appearance-paragraph-spacing');
+    const backgroundMode = document.getElementById('appearance-bg-mode');
+    const backgroundOpacity = document.getElementById('appearance-bg-opacity');
+    const opacityValue = document.getElementById('appearance-opacity-value');
+    const backgroundImageInput = document.getElementById('appearance-bg-image');
+    const clearBackgroundBtn = document.getElementById('appearance-bg-clear');
+    const backgroundThumb = document.getElementById('appearance-bg-thumb');
+    const backgroundThumbImg = document.getElementById('appearance-bg-thumb-img');
+    const backgroundThumbEmpty = document.getElementById('appearance-bg-thumb-empty');
+    const previewBackgroundLayer = document.getElementById('appearance-preview-bg');
+    const spacingValue = document.getElementById('appearance-spacing-value');
+    const message = document.getElementById('workspace-appearance-message');
+    const preview = document.getElementById('appearance-preview');
+    const resetBtn = document.getElementById('appearance-reset-btn');
+
+    if (!form || !bgColor || !bgColorText || !fontFamily || !linkColor || !linkColorText || !paragraphSpacing || !backgroundMode || !backgroundOpacity || !opacityValue || !spacingValue || !preview || !previewBackgroundLayer) {
+        return;
+    }
+
+    const defaults = {
+        page_bg_color: '#fffaf2',
+        text_font_family: 'Noto Serif SC',
+        link_color: '#16324f',
+        paragraph_spacing: '1rem',
+        background_mode: 'scroll_tile',
+        background_opacity: 0.22,
+    };
+
+    const workspaceId = Number('{{ workspace.id }}');
+    let themeConfigId = Number('{{ theme_config.id|default:0 }}') || null;
+    let backgroundImageUrl = '{{ theme_config.background_image_url|default:""|escapejs }}';
+
+    const setMessage = (text, isError = false) => {
+        if (!message) {
+            return;
+        }
+        message.textContent = text || '';
+        message.style.color = isError ? '#b42318' : '';
+    };
+
+    const normalizeHex = (value, fallback) => {
+        const trimmed = String(value || '').trim();
+        if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+            return trimmed;
+        }
+        return fallback;
+    };
+
+    const currentPayload = () => {
+        const spacing = `${Number(paragraphSpacing.value || 1).toFixed(1)}rem`;
+        return {
+            novel: workspaceId,
+            page_bg_color: normalizeHex(bgColorText.value, defaults.page_bg_color),
+            text_font_family: fontFamily.value || defaults.text_font_family,
+            link_color: normalizeHex(linkColorText.value, defaults.link_color),
+            paragraph_spacing: spacing,
+            background_mode: backgroundMode.value || defaults.background_mode,
+            background_opacity: Number(backgroundOpacity.value || defaults.background_opacity),
+        };
+    };
+
+    const setBackgroundThumb = (url) => {
+        backgroundImageUrl = url || '';
+        if (!backgroundThumb || !backgroundThumbImg) {
+            return;
+        }
+
+        if (backgroundImageUrl) {
+            backgroundThumb.classList.remove('empty');
+            backgroundThumbImg.hidden = false;
+            backgroundThumbImg.src = backgroundImageUrl;
+            if (backgroundThumbEmpty) {
+                backgroundThumbEmpty.hidden = true;
+            }
+            return;
+        }
+
+        backgroundThumb.classList.add('empty');
+        backgroundThumbImg.hidden = true;
+        backgroundThumbImg.src = '';
+        if (backgroundThumbEmpty) {
+            backgroundThumbEmpty.hidden = false;
+        }
+    };
+
+    const applyPreview = () => {
+        const data = currentPayload();
+        preview.style.background = data.page_bg_color;
+        preview.style.fontFamily = `"${data.text_font_family}", "Segoe UI", "PingFang SC", sans-serif`;
+        preview.style.color = 'var(--text)';
+        preview.style.setProperty('--appearance-link-color', data.link_color);
+        preview.style.setProperty('--appearance-paragraph-spacing', data.paragraph_spacing);
+        preview.style.setProperty('--appearance-bg-opacity', String(data.background_opacity));
+        previewBackgroundLayer.style.backgroundImage = backgroundImageUrl ? `url('${backgroundImageUrl}')` : 'none';
+        previewBackgroundLayer.style.opacity = String(data.background_opacity);
+        if (data.background_mode === 'fixed_cover') {
+            previewBackgroundLayer.style.backgroundSize = 'cover';
+            previewBackgroundLayer.style.backgroundRepeat = 'no-repeat';
+            previewBackgroundLayer.style.backgroundAttachment = 'fixed';
+        } else {
+            previewBackgroundLayer.style.backgroundSize = 'auto';
+            previewBackgroundLayer.style.backgroundRepeat = 'repeat';
+            previewBackgroundLayer.style.backgroundAttachment = 'scroll';
+        }
+        spacingValue.textContent = data.paragraph_spacing;
+        opacityValue.textContent = data.background_opacity.toFixed(2);
+    };
+
+    const syncColorInputs = (picker, textInput, fallback) => {
+        picker.addEventListener('input', () => {
+            textInput.value = picker.value;
+            applyPreview();
+        });
+
+        textInput.addEventListener('change', () => {
+            const value = normalizeHex(textInput.value, fallback);
+            textInput.value = value;
+            picker.value = value;
+            applyPreview();
+        });
+    };
+
+    syncColorInputs(bgColor, bgColorText, defaults.page_bg_color);
+    syncColorInputs(linkColor, linkColorText, defaults.link_color);
+
+    fontFamily.addEventListener('change', applyPreview);
+    paragraphSpacing.addEventListener('input', applyPreview);
+    backgroundMode.addEventListener('change', applyPreview);
+    backgroundOpacity.addEventListener('input', applyPreview);
+
+    if (backgroundImageInput) {
+        backgroundImageInput.addEventListener('change', async (event) => {
+            const file = event.target.files && event.target.files[0];
+            if (!file) {
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('novel', String(workspaceId));
+            formData.append('background_image', file);
+
+            setMessage('背景图片上传中...');
+            try {
+                const request = {
+                    method: 'POST',
+                    body: formData,
+                };
+
+                const response = typeof fetchWithAuthRetry === 'function'
+                    ? await fetchWithAuthRetry('/api/customization/theme-configs/upload_background/', request)
+                    : await fetch('/api/customization/theme-configs/upload_background/', request);
+
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    setMessage(data.detail || '背景图上传失败', true);
+                    return;
+                }
+
+                if (data.id) {
+                    themeConfigId = data.id;
+                }
+                setBackgroundThumb(data.background_image_url || '');
+                applyPreview();
+                setMessage('背景图已上传，记得保存外观参数。');
+            } catch (error) {
+                setMessage('网络错误，背景图上传失败', true);
+            } finally {
+                backgroundImageInput.value = '';
+            }
+        });
+    }
+
+    if (clearBackgroundBtn) {
+        clearBackgroundBtn.addEventListener('click', async () => {
+            if (!themeConfigId) {
+                setBackgroundThumb('');
+                applyPreview();
+                setMessage('背景图已移除，保存后生效。');
+                return;
+            }
+
+            setMessage('正在移除背景图...');
+            try {
+                const request = {
+                    method: 'POST',
+                };
+
+                const response = typeof fetchWithAuthRetry === 'function'
+                    ? await fetchWithAuthRetry(`/api/customization/theme-configs/${themeConfigId}/clear_background/`, request)
+                    : await fetch(`/api/customization/theme-configs/${themeConfigId}/clear_background/`, request);
+
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    setMessage(data.detail || '移除失败，请稍后重试', true);
+                    return;
+                }
+
+                setBackgroundThumb('');
+                applyPreview();
+                setMessage('背景图已移除。');
+            } catch (error) {
+                setMessage('网络错误，移除失败', true);
+            }
+        });
+    }
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            bgColor.value = defaults.page_bg_color;
+            bgColorText.value = defaults.page_bg_color;
+            fontFamily.value = defaults.text_font_family;
+            linkColor.value = defaults.link_color;
+            linkColorText.value = defaults.link_color;
+            paragraphSpacing.value = '1';
+            backgroundMode.value = defaults.background_mode;
+            backgroundOpacity.value = String(defaults.background_opacity);
+            applyPreview();
+            setMessage('已恢复默认值，保存后生效。');
+        });
+    }
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        setMessage('保存中...');
+
+        const payload = currentPayload();
+        const request = {
+            method: themeConfigId ? 'PATCH' : 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        };
+
+        const url = themeConfigId
+            ? `/api/customization/theme-configs/${themeConfigId}/`
+            : '/api/customization/theme-configs/';
+
+        try {
+            const response = typeof fetchWithAuthRetry === 'function'
+                ? await fetchWithAuthRetry(url, request)
+                : await fetch(url, request);
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const detail = data.detail || data.theme?.[0] || '保存失败，请稍后重试';
+                setMessage(detail, true);
+                return;
+            }
+
+            if (!themeConfigId && data.id) {
+                themeConfigId = data.id;
+            }
+
+            if (typeof data.background_image_url === 'string') {
+                setBackgroundThumb(data.background_image_url);
+            }
+
+            setMessage('外观配置已保存，阅读页将使用最新主题。');
+        } catch (error) {
+            setMessage('网络错误，保存失败', true);
+        }
+    });
+
+    setBackgroundThumb(backgroundImageUrl);
+    applyPreview();
 });
 </script>
 {% endif %}

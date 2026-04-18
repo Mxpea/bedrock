@@ -6,6 +6,10 @@ from apps.core.models import TimeStampedModel
 
 
 class ThemeConfig(TimeStampedModel):
+    class BackgroundMode(models.TextChoices):
+        SCROLL_TILE = "scroll_tile", "随页面滚动并平铺"
+        FIXED_COVER = "fixed_cover", "静止背景"
+
     SAFE_FONT_CHOICES = [
         ("Noto Serif SC", "Noto Serif SC"),
         ("Noto Sans SC", "Noto Sans SC"),
@@ -21,6 +25,13 @@ class ThemeConfig(TimeStampedModel):
 
     novel = models.OneToOneField("novels.Novel", on_delete=models.CASCADE, related_name="theme_config")
     page_bg_color = models.CharField(max_length=32, default="#fffaf2")
+    background_image = models.ImageField(upload_to="theme_backgrounds/", blank=True, null=True)
+    background_mode = models.CharField(
+        max_length=20,
+        choices=BackgroundMode.choices,
+        default=BackgroundMode.SCROLL_TILE,
+    )
+    background_opacity = models.FloatField(default=0.22)
     text_font_family = models.CharField(max_length=64, choices=SAFE_FONT_CHOICES, default="Noto Serif SC")
     link_color = models.CharField(max_length=32, default="#16324f")
     paragraph_spacing = models.CharField(max_length=16, default="1rem")

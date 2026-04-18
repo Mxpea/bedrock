@@ -9,7 +9,7 @@
     <script defer src="{% static 'js/site.js' %}?v={% now 'U' %}"></script>
 </head>
 <body>
-    <header class="topbar">
+    <header class="topbar" id="global-topbar">
         <a class="brand" href="/">Bedrock</a>
         <nav class="topnav" id="global-nav">
             <a href="/" data-nav="home">首页</a>
@@ -18,10 +18,20 @@
             <a href="/register/" data-nav="register" class="guest-only">注册</a>
         </nav>
         <div class="workspace-switcher" id="workspace-switcher" hidden></div>
-        <button class="global-theme-toggle" aria-label="切换夜间模式" title="切换深色/浅色模式">
-            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="theme-icon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-        </button>
+        <div class="topbar-actions">
+            <button class="topbar-collapse-toggle" id="topbar-collapse-btn" type="button" aria-label="收起顶栏" title="收起顶栏">
+                <span class="topbar-chevron" aria-hidden="true">⌃</span>
+                <span>收起</span>
+            </button>
+            <button class="global-theme-toggle" aria-label="切换夜间模式" title="切换深色/浅色模式" type="button">
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="theme-icon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
+        </div>
     </header>
+    <button class="topbar-expand-toggle" id="topbar-expand-btn" type="button" aria-label="展开顶栏" title="展开顶栏" hidden>
+        <span class="topbar-chevron" aria-hidden="true">⌄</span>
+        <span>展开导航</span>
+    </button>
     <main class="page-shell">
         {% block content %}{% endblock %}
     </main>
