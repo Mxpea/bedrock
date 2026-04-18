@@ -1,9 +1,14 @@
-from django.views.generic import TemplateView
-from django.db import models
-from django.shortcuts import get_object_or_404
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth import get_user_model
+from django.db import models
+from django.http import Http404
+from django.shortcuts import get_object_or_404
+from django.views.generic import TemplateView
+
+from apps.novels.models import Chapter, Novel
 
 User = get_user_model()
+
 
 class HomePageView(TemplateView):
     template_name = "home.html"
@@ -24,8 +29,45 @@ class DashboardPageView(TemplateView):
 class NovelListPageView(TemplateView):
     template_name = "novels/list.html"
 
-class EditorPageView(TemplateView):
-    template_name = "novels/editor.html"
+
+class WorkspacePageView(LoginRequiredMixin, TemplateView):
+    template_name = "workspace/detail.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        workspace_id = kwargs.get("workspace_id")
+        module = kwargs.get("module") or Novel.Module.WRITING
+
+        workspace = get_object_or_404(Novel, id=workspace_id, is_deleted=False)
+        if workspace.author != self.request.user:
+            raise Http404("你无权访问该工作区")
+
+        if module not in {choice[0] for choice in Novel.Module.choices}:
+            module = Novel.Module.WRITING
+
+        chapters = workspace.chapters.order_by("order", "id")
+        chapter_id = self.request.GET.get("chapter_id") or workspace.last_open_chapter_id
+        active_chapter = chapters.filter(id=chapter_id).first() if chapter_id else chapters.first()
+
+        workspace.last_open_module = module
+        update_fields = ["last_open_module", "updated_at"]
+        if active_chapter:
+            workspace.last_open_chapter_id = active_chapter.id
+            update_fields.insert(1, "last_open_chapter_id")
+        workspace.save(update_fields=update_fields)
+
+        context.update(
+            {
+                "workspace": workspace,
+                "module": module,
+                "chapters": chapters,
+                "active_chapter": active_chapter,
+                "module_labels": dict(Novel.Module.choices),
+                "module_label": dict(Novel.Module.choices).get(module, module),
+            }
+        )
+        return context
+
 
 class ReaderPageView(TemplateView):
     template_name = "novels/reader.html"
@@ -53,23 +95,25 @@ class ReaderPageView(TemplateView):
         chapter_qs = self._accessible_chapters()
 
         chapter_id = kwargs.get("chapter_id") or self.request.GET.get("chapter_id")
-        novel_id = self.request.GET.get("novel_id")
+        workspace_id = self.request.GET.get("workspace_id") or self.request.GET.get("novel_id")
 
         chapter = None
         if chapter_id:
             chapter = chapter_qs.filter(id=chapter_id).first()
-        elif novel_id:
-            chapter = chapter_qs.filter(novel_id=novel_id).order_by("order", "id").first()
+        elif workspace_id:
+            chapter = chapter_qs.filter(novel_id=workspace_id).order_by("order", "id").first()
         else:
             chapter = chapter_qs.order_by("-updated_at").first()
 
         if not chapter:
-            context.update({
-                "chapter": None,
-                "chapter_list": [],
-                "prev_chapter_id": None,
-                "next_chapter_id": None,
-            })
+            context.update(
+                {
+                    "chapter": None,
+                    "chapter_list": [],
+                    "prev_chapter_id": None,
+                    "next_chapter_id": None,
+                }
+            )
             return context
 
         chapter_list_qs = chapter_qs.filter(novel=chapter.novel).order_by("order", "id")
@@ -79,13 +123,16 @@ class ReaderPageView(TemplateView):
         prev_chapter_id = chapter_ids[current_idx - 1] if current_idx > 0 else None
         next_chapter_id = chapter_ids[current_idx + 1] if current_idx < len(chapter_ids) - 1 else None
 
-        context.update({
-            "chapter": chapter,
-            "chapter_list": chapter_list_qs,
-            "prev_chapter_id": prev_chapter_id,
-            "next_chapter_id": next_chapter_id,
-        })
+        context.update(
+            {
+                "chapter": chapter,
+                "chapter_list": chapter_list_qs,
+                "prev_chapter_id": prev_chapter_id,
+                "next_chapter_id": next_chapter_id,
+            }
+        )
         return context
+
 
 class AuthorProfilePageView(TemplateView):
     template_name = "author_profile.html"
@@ -95,14 +142,26 @@ class AuthorProfilePageView(TemplateView):
         username = kwargs.get("username")
         profile_user = get_object_or_404(User, username=username)
         is_owner = self.request.user.is_authenticated and self.request.user == profile_user
-        
-        from apps.novels.models import Novel
-        if is_owner:
-            novels = Novel.objects.filter(author=profile_user, is_deleted=False).order_by("-updated_at")
-        else:
-            novels = Novel.objects.filter(author=profile_user, is_deleted=False, visibility__in=[Novel.Visibility.PUBLIC, Novel.Visibility.LINK]).order_by("-updated_at")
 
-        context["profile_user"] = profile_user
-        context["is_owner"] = is_owner
-        context["novels"] = novels
+        base_workspaces = Novel.objects.filter(author=profile_user, is_deleted=False)
+        public_workspaces = base_workspaces.filter(visibility__in=[Novel.Visibility.PUBLIC, Novel.Visibility.LINK])
+
+        if is_owner:
+            workspaces = base_workspaces.order_by("-updated_at")
+        else:
+            workspaces = public_workspaces.order_by("-updated_at")
+
+        public_workspaces_count = public_workspaces.count()
+        public_chapters_count = Chapter.objects.filter(novel__in=public_workspaces, is_published=True).count()
+        from django.utils import timezone
+        days_joined = (timezone.now() - profile_user.date_joined).days
+
+        context.update({
+            "profile_user": profile_user,
+            "is_owner": is_owner,
+            "workspaces": workspaces,
+            "public_workspaces_count": public_workspaces_count,
+            "public_chapters_count": public_chapters_count,
+            "days_joined": days_joined,
+        })
         return context

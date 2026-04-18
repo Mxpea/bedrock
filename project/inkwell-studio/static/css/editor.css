@@ -1,0 +1,334 @@
+
+
+
+/* Workspace */
+.editor-workspace {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+.editor-left-panel {
+    width: 240px;
+    background: var(--bg-soft);
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+    transition: width 0.3s ease;
+}
+
+.chapter-fold {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100%;
+}
+
+.chapter-fold-summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    user-select: none;
+}
+
+.chapter-fold-summary::-webkit-details-marker {
+    display: none;
+}
+
+.chapter-fold > .chapter-fold-summary::after {
+    content: "▾";
+    color: var(--muted);
+    font-size: 0.82rem;
+    margin-left: auto;
+    margin-right: 8px;
+}
+
+.chapter-fold:not([open]) > .chapter-fold-summary::after {
+    transform: rotate(-90deg);
+}
+
+.chapter-fold .icon-btn {
+    position: relative;
+    z-index: 1;
+}
+
+.chapter-list-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.chapter-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text);
+    transition: background 0.2s;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.editor-write-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 400px;
+    background: var(--bg);
+}
+
+.editor-preview-pane {
+    flex: 1;
+    background: var(--bg-soft);
+    padding: 32px 40px;
+    overflow-y: auto;
+    border-right: 1px solid var(--line);
+    min-width: 320px;
+}
+
+.preview-content {
+    max-width: 600px;
+    margin: 0 auto;
+    font-family: inherit;
+    line-height: 1.8;
+}
+
+/* Side Panel */
+.editor-side-panel {
+    width: 260px;
+    background: var(--bg-soft);
+    border-left: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    transition: width 0.3s ease;
+}
+.editor-side-panel.collapsed {
+    width: 0;
+    border-left: none;
+    overflow: hidden;
+}
+
+.panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--line);
+}
+
+.tab-btn {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 12px 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+}
+.tab-btn.active, .tab-btn:hover {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.panel-content {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.db-item {
+    padding: 8px 12px;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+.db-item:hover {
+    background: rgba(22, 50, 79, 0.05);
+}
+body.dark-mode .db-item:hover { background: rgba(255,255,255,0.05); }
+
+.chapter-item:hover { background: rgba(22, 50, 79, 0.04); }
+body.dark-mode .chapter-item:hover { background: rgba(255, 255, 255, 0.04); }
+
+.chapter-item.active {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(22, 50, 79, 0.15);
+}
+body.dark-mode .chapter-item.active {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.editor-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+}
+
+.editor-toolbar {
+    height: auto;
+    min-height: 52px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 24px;
+    background: var(--bg-soft);
+    transition: background 0.4s ease;
+}
+
+.tool-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap; /* support overflowing toolbars securely */
+}
+.tool-group.right { gap: 12px; margin-left: auto; }
+
+.editor-context {
+    font-size: 0.82rem;
+    color: var(--muted);
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--bg);
+}
+
+.tool-btn {
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 6px;
+    min-width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 1.05rem;
+    transition: all 0.2s;
+    font-family: "Segoe UI", sans-serif;
+    padding: 0 6px;
+}
+.tool-btn.txt-icon { font-weight: 700; font-size: 0.95rem; }
+.tool-btn:hover { background: rgba(22, 50, 79, 0.06); border-color: rgba(22, 50, 79, 0.1); }
+body.dark-mode .tool-btn:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.1); }
+
+.tool-btn.syntax-custom { width: auto; padding: 0 8px; font-family: monospace; font-size: 0.85rem; color: var(--accent); background: rgba(22, 50, 79, 0.04); border-color: rgba(22, 50, 79, 0.1); }
+body.dark-mode .tool-btn.syntax-custom { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); }
+
+.divider { width: 1px; height: 20px; background: var(--line); margin: 0 8px; }
+
+.status-msg { font-size: 0.85rem; color: var(--muted); }
+
+.editor-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 32px 0 64px;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.chapter-title-input {
+    border: none;
+    outline: none;
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--accent-strong);
+    padding: 0 24px 24px;
+    background: transparent;
+    font-family: inherit;
+    transition: color 0.4s ease;
+}
+.chapter-title-input::placeholder { color: rgba(22, 50, 79, 0.2); }
+body.dark-mode .chapter-title-input::placeholder { color: rgba(255, 255, 255, 0.2); }
+
+.chapter-content-input {
+    flex: 1;
+    min-height: 50vh; /* Make sure there gets some room to type */
+    border: none;
+    outline: none;
+    resize: none; /* Auto-expand height handled by JS */
+    padding: 0 24px;
+    font-size: 1.15rem;
+    line-height: 1.9;
+    color: var(--text);
+    background: transparent;
+    font-family: "Segoe UI", "PingFang SC", sans-serif;
+    transition: color 0.4s ease;
+    overflow: hidden; /* Hide scrollbar when auto expanding */
+}
+.chapter-content-input::placeholder { color: rgba(22, 50, 79, 0.2); }
+body.dark-mode .chapter-content-input::placeholder { color: rgba(255, 255, 255, 0.2); }
+
+.button.small { padding: 6px 16px; font-size: 0.85rem; min-width: auto; }
+
+/* Modals & Dialogs for Font Upload */
+.modal {
+    border: none;
+    border-radius: 20px;
+    padding: 0;
+    background: transparent;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    max-width: 480px;
+    width: 90%;
+    margin: auto auto; 
+    color: var(--text);
+}
+.modal::backdrop {
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+}
+.modal-content {
+    background: var(--bg);
+    padding: 32px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    color: var(--text);
+}
+.modal-content h3 { margin-top: 0; color: var(--text); margin-bottom: 12px; }
+.tool-select {
+    border: 1px solid var(--line);
+    background: var(--bg-soft);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    height: 32px;
+    cursor: pointer;
+    min-width: 120px;
+}
+.mt-3 { margin-top: 24px; }
+
+.fade-in { animation: fadeIn 0.4s ease-out forwards; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 768px) {
+    .editor-side-panel {
+        width: 0;
+        border-left: none;
+        overflow: hidden;
+    }
+
+    .editor-left-panel {
+        width: 180px;
+    }
+}

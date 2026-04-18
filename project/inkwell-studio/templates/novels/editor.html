@@ -1,27 +1,39 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Bedrock - 创作台{% endblock %}
+{% block title %}Bedrock - 正文编辑区域{% endblock %}
 
 {% block content %}
 <div class="editor-layout fade-in">
     <!-- Editor Header -->
     <header class="editor-header">
         <div class="header-left">
-            <a href="/dashboard/" class="back-btn" title="返回工作台">← 返回</a>
+            <a href="/dashboard/" class="back-btn" id="btn-back-workspace" title="返回工作区">← 返回</a>
             <span class="breadcrumb" id="editor-breadcrumb">加载中...</span>
         </div>
         <div class="header-right">
             <span class="status-msg text-muted" id="save-status"></span>
-            <button class="button secondary small" id="btn-preview">预览 (受限)</button>
+            <button class="button secondary small" id="btn-preview">阅读预览</button>
             <button class="button primary small" id="btn-save">保存</button>
-            <button class="icon-btn" title="作品设置">⚙</button>
+            <button class="icon-btn" id="btn-toggle-side" title="切换辅助面板"><i class="ph ph-sidebar-simple"></i></button>
         </div>
     </header>
 
-    <!-- Editor Workspace (2 Columns + DB panel) -->
+    <!-- Editor Workspace (3 Columns) -->
     <div class="editor-workspace">
-        <!-- 1. Markdown 编辑区 -->
+        
+        <!-- 1. 左侧：章节树状列表 (Upstream) -->
+        <aside class="editor-left-panel">
+            <div class="panel-header-row" style="padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line);">
+                <span class="eyebrow" style="margin: 0;">正文章节</span>
+                <button class="icon-btn small" id="btn-new-chapter" title="新建章节" style="font-size: 1rem;">+</button>
+            </div>
+            <div class="chapter-list-nav" id="chapter-list-container">
+                <p class="text-muted" style="text-align: center; margin-top: 24px; font-size: 0.85rem;">加载中...</p>
+            </div>
+        </aside>
+
+        <!-- 2. 中间：Markdown 编辑器 (Downstream) -->
         <main class="editor-write-pane">
             <div class="editor-toolbar">
                 <div class="tool-group flex-wrap">
@@ -53,24 +65,35 @@
             </div>
             
             <div class="editor-body">
-                <input type="text" id="chapter-title-input" class="chapter-title-input" value="" placeholder="输入章节标题..." />
-                <textarea id="main-editor-area" class="chapter-content-input" placeholder="在这里开始你的创作..."></textarea>
+                <input type="text" id="chapter-title-input" class="chapter-title-input" value="" placeholder="输入章节标题..." autocomplete="off"/>
+                <textarea id="main-editor-area" class="chapter-content-input" placeholder="在这里开始创作正文..."></textarea>
             </div>
         </main>
 
-        <!-- 3. 右侧数据库面板 (可收缩) -->
-        <aside class="editor-side-panel">
+        <!-- 3. 右侧：可收缩侧边栏 (Context) -->
+        <aside class="editor-side-panel" id="editor-right-panel">
             <div class="panel-tabs">
-                <button class="tab-btn active" title="章节导航">📜 章节</button>
-                <button class="tab-btn" title="大纲">📁 数据库</button>
+                <button class="tab-btn active" data-target="tab-info" title="章节信息">ℹ️ 信息</button>
+                <button class="tab-btn" data-target="tab-comments" title="本章吐槽">💬 吐槽</button>
+                <button class="tab-btn" data-target="tab-quotes" title="快速引用">🔗 引用</button>
             </div>
-            <div class="panel-content" id="chapter-list-panel" style="display: flex; gap: 8px; flex-direction: column;">
-                <button class="button secondary small" id="btn-new-chapter">+ 新建章节</button>
-                <div id="chapter-list-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
-                    <p class="text-muted" style="text-align: center; margin-top: 24px;">加载中...</p>
+            <div class="panel-content">
+                <!-- Info Tab -->
+                <div id="tab-info" class="tab-pane active" style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="background: var(--bg); padding: 12px; border-radius: 8px; border: 1px solid var(--line);">
+                        <p id="word-count" style="font-size: 0.85rem; margin: 0 0 4px; font-weight: bold; color: var(--accent);">字数：0</p>
+                        <p id="chapter-status" class="text-muted" style="font-size: 0.8rem; margin: 0;">状态：草稿</p>
+                    </div>
                 </div>
-                <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--line);">
-                    <p id="word-count" class="text-muted" style="font-size: 0.85rem; margin: 0;">字数：0</p>
+                
+                <!-- Comments Tab (Placeholder) -->
+                <div id="tab-comments" class="tab-pane" style="display: none;">
+                    <p class="text-muted" style="font-size: 0.85rem; text-align: center; margin-top: 2rem;">暂无大段吐槽，<br>读者划线评论将在这里显示。</p>
+                </div>
+                
+                <!-- Quotes Tab (Placeholder) -->
+                <div id="tab-quotes" class="tab-pane" style="display: none;">
+                    <p class="text-muted" style="font-size: 0.85rem; text-align: center; margin-top: 2rem;">当前工作区的人物、世界观设定<br>可在这里搜索拖曳引用。</p>
                 </div>
             </div>
         </aside>
@@ -201,10 +224,41 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnSave = document.getElementById('btn-save');
     const btnPreview = document.getElementById('btn-preview');
     const breadcrumb = document.getElementById('editor-breadcrumb');
+    const btnBackWorkspace = document.getElementById('btn-back-workspace');
+    const btnToggleSide = document.getElementById('btn-toggle-side');
+    const editorRightPanel = document.getElementById('editor-right-panel');
+    const chapterStatus = document.getElementById('chapter-status');
     
     let currentChapterId = new URLSearchParams(window.location.search).get('chapter_id');
-    let currentNovelId = new URLSearchParams(window.location.search).get('novel_id');
+    let currentNovelId = new URLSearchParams(window.location.search).get('workspace_id') || new URLSearchParams(window.location.search).get('novel_id');
     let isSaving = false;
+
+    // Tabs toggle logic
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+            const targetId = btn.getAttribute('data-target');
+            btn.classList.add('active');
+            let pane = document.getElementById(targetId);
+            if (pane) pane.style.display = 'block';
+        });
+    });
+
+    // Right Sidebar toggle logic
+    btnToggleSide.addEventListener('click', () => {
+        if (editorRightPanel.style.display === 'none' || editorRightPanel.classList.contains('collapsed')) {
+            editorRightPanel.classList.remove('collapsed');
+            editorRightPanel.style.display = '';
+        } else {
+            editorRightPanel.classList.add('collapsed');
+            editorRightPanel.style.display = 'none';
+        }
+    });
+
+    if (currentNovelId) {
+        btnBackWorkspace.href = `/workspace/${currentNovelId}/writing/`;
+    }
 
     // Word count update
     const updateWordCount = () => {
@@ -229,9 +283,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     container.innerHTML = chapters.map(ch => 
                         `<div class="chapter-item ${ch.id == currentChapterId ? 'active' : ''}" 
-                              style="padding: 8px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;"
-                              onclick="window.location.href='/editor/?chapter_id=${ch.id}'">
-                            ${ch.title}
+                            onclick="window.location.href='/editor/?chapter_id=${ch.id}&workspace_id=${currentNovelId}'">
+                            <i class="ph ph-file-text" style="margin-right: 4px; opacity: 0.6; font-size: 0.9em;"></i> ${ch.title || '未命名'}
                         </div>`
                     ).join('');
                 }
@@ -242,8 +295,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     document.getElementById('btn-new-chapter')?.addEventListener('click', () => {
-        if (!currentNovelId) return alert('请先指定作品');
-        window.location.href = `/editor/?novel_id=${currentNovelId}`;
+        if (!currentNovelId) return alert('请先指定工作区');
+        window.location.href = `/editor/?workspace_id=${currentNovelId}`;
     });
 
     const loadChapter = async () => {
@@ -258,17 +311,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     titleInput.value = data.title;
                     editor.value = data.content_md;
                     currentNovelId = data.novel;
-                    breadcrumb.textContent = `作品 #${data.novel} / ${data.title}`;
+                    breadcrumb.textContent = `工作区 ${data.workspace_name || '#' + data.novel} / ${data.title}`;
+                    if (chapterStatus) chapterStatus.textContent = `状态：${data.is_published ? '已发布' : '草稿'}`;
                     resizeEditor();
                     updateWordCount();
                     loadChapterList(currentNovelId);
                 }
             } else if (currentNovelId) {
-                // If only novel_id is provided, try to create a new chapter
-                breadcrumb.textContent = `作品 #${currentNovelId} / 新章节`;
+                // If only workspace_id is provided, try to create a new chapter
+                breadcrumb.textContent = `工作区 #${currentNovelId} / 新章节`;
                 loadChapterList(currentNovelId);
             } else {
-                breadcrumb.textContent = `未指定作品`;
+                breadcrumb.textContent = `未指定工作区`;
             }
         } catch (err) {
             console.error(err);
@@ -306,11 +360,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json();
                 if (!currentChapterId) {
                     currentChapterId = data.id;
-                    window.history.replaceState({}, '', `/editor/?chapter_id=${data.id}`);
+                    window.history.replaceState({}, '', `/editor/?chapter_id=${data.id}&workspace_id=${currentNovelId}`);
                 }
                 const now = new Date();
                 saveStatus.textContent = `已自动保存 ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-                breadcrumb.textContent = `作品 #${data.novel} / ${data.title}`;
+                breadcrumb.textContent = `工作区 ${data.workspace_name || '#' + data.novel} / ${data.title}`;
             } else {
                 saveStatus.textContent = '保存失败';
             }
@@ -341,7 +395,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnPreview.addEventListener('click', () => {
         if (currentChapterId) {
-            window.location.href = `/reader/?chapter_id=${currentChapterId}`;
+            const workspaceParam = currentNovelId ? `&workspace_id=${currentNovelId}` : '';
+            window.location.href = `/reader/?chapter_id=${currentChapterId}${workspaceParam}`;
         }
     });
 
@@ -490,14 +545,45 @@ document.addEventListener('DOMContentLoaded', () => {
     display: flex;
     flex: 1;
     overflow: hidden;
+    position: relative;
+}
+
+.editor-left-panel {
+    width: 240px;
+    background: var(--bg-soft);
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+    transition: width 0.3s ease;
+}
+
+.chapter-list-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.chapter-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text);
+    transition: background 0.2s;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .editor-write-pane {
-    flex: 1.2;
+    flex: 1;
     display: flex;
     flex-direction: column;
-    border-right: 1px solid var(--line);
-    min-width: 320px;
+    min-width: 400px;
     background: var(--bg);
 }
 
@@ -520,9 +606,16 @@ document.addEventListener('DOMContentLoaded', () => {
 /* Side Panel */
 .editor-side-panel {
     width: 260px;
-    background: var(--bg);
+    background: var(--bg-soft);
+    border-left: 1px solid var(--line);
     display: flex;
     flex-direction: column;
+    transition: width 0.3s ease;
+}
+.editor-side-panel.collapsed {
+    width: 0;
+    border-left: none;
+    overflow: hidden;
 }
 
 .panel-tabs {

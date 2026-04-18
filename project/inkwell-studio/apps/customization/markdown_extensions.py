@@ -1,6 +1,7 @@
 import re
 
 import bleach
+import markdown
 
 TOKEN_PATTERNS = {
     "highlight": re.compile(r"\{高亮\|(.+?)\}"),
@@ -14,7 +15,48 @@ TOKEN_PATTERNS = {
 }
 
 ALLOWED_ADVANCED_TAGS = ["ruby", "rt", "span", "div", "i", "b", "br", "hr"]
-ALLOWED_ADVANCED_ATTRS = {"*": ["class", "id", "title", "style"]}
+ALLOWED_ADVANCED_ATTRS = {"*": ["class", "id", "title", "data-font"]}
+
+ALLOWED_MARKDOWN_TAGS = [
+    "a",
+    "p",
+    "br",
+    "hr",
+    "blockquote",
+    "code",
+    "pre",
+    "strong",
+    "em",
+    "ul",
+    "ol",
+    "li",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ruby",
+    "rt",
+    "span",
+    "div",
+    "i",
+    "b",
+]
+ALLOWED_MARKDOWN_ATTRS = {
+    "a": ["href", "title", "target", "rel"],
+    "*": ["class", "id", "title", "data-font"],
+}
+
+
+def _replace_font_token(match: re.Match) -> str:
+    # Keep only common font name characters to prevent attribute injection.
+    raw_font = match.group(1).strip()
+    font_name = re.sub(r"[^\w\s\-\u4e00-\u9fff]", "", raw_font)
+    if not font_name:
+        font_name = "sans-serif"
+    content = match.group(2)
+    return f'<span class="mk-custom-font" data-font="{font_name}">{content}</span>'
 
 
 def apply_safe_tokens(text: str) -> str:
@@ -25,15 +67,31 @@ def apply_safe_tokens(text: str) -> str:
     text = TOKEN_PATTERNS["scratch"].sub(r'<span class="mk-scratch">\1</span>', text)
     text = TOKEN_PATTERNS["jitter"].sub(r'<span class="mk-jitter">\1</span>', text)
     text = TOKEN_PATTERNS["wobble"].sub(r'<span class="mk-wobble">\1</span>', text)
-    text = TOKEN_PATTERNS["font"].sub(r'<span class="mk-custom-font" style="font-family: \'\1\', sans-serif;">\2</span>', text)
+    text = TOKEN_PATTERNS["font"].sub(_replace_font_token, text)
     return text
 
 
+def _render_markdown(text: str) -> str:
+    return markdown.markdown(
+        text,
+        extensions=["extra", "sane_lists", "nl2br"],
+        output_format="html5",
+    )
+
+
 def sanitize_standard_content(text: str) -> str:
-    html = apply_safe_tokens(bleach.clean(text, tags=[], attributes={}, strip=True))
-    return html.replace("\n", "<br>")
+    source = bleach.clean(text, tags=[], attributes={}, strip=True)
+    source = apply_safe_tokens(source)
+    html = _render_markdown(source)
+    return bleach.clean(html, tags=ALLOWED_MARKDOWN_TAGS, attributes=ALLOWED_MARKDOWN_ATTRS, strip=True)
 
 
 def sanitize_advanced_content(text: str) -> str:
-    html = apply_safe_tokens(text)
-    return bleach.clean(html, tags=ALLOWED_ADVANCED_TAGS, attributes=ALLOWED_ADVANCED_ATTRS, strip=True)
+    source = apply_safe_tokens(text)
+    html = _render_markdown(source)
+    return bleach.clean(
+        html,
+        tags=list(set(ALLOWED_MARKDOWN_TAGS + ALLOWED_ADVANCED_TAGS)),
+        attributes=ALLOWED_ADVANCED_ATTRS,
+        strip=True,
+    )

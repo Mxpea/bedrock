@@ -9,16 +9,27 @@ from .serializers import ChapterSerializer, NovelSerializer
 
 class NovelViewSet(viewsets.ModelViewSet):
     serializer_class = NovelSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAuthorOrReadOnly, CanReadNovel]
     filterset_fields = ["visibility"]
     search_fields = ["title", "summary"]
-    ordering_fields = ["created_at", "updated_at", "title"]
+    ordering_fields = ["created_at", "updated_at", "title", "last_open_module"]
+
+    def get_permissions(self):
+        if self.action in {"list", "retrieve"}:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated(), IsAuthorOrReadOnly(), CanReadNovel()]
 
     def get_queryset(self):
         user = self.request.user
-        return Novel.objects.filter(is_deleted=False).filter(
-            Q(author=user) | Q(visibility__in=[Novel.Visibility.PUBLIC, Novel.Visibility.LINK])
-        )
+        queryset = Novel.objects.filter(is_deleted=False)
+
+        owner_filter = self.request.GET.get("owner")
+        if owner_filter == "me" and user.is_authenticated:
+            return queryset.filter(author=user)
+
+        if user.is_authenticated:
+            return queryset.filter(Q(author=user) | Q(visibility__in=[Novel.Visibility.PUBLIC, Novel.Visibility.LINK]))
+
+        return queryset.filter(visibility=Novel.Visibility.PUBLIC)
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
@@ -45,4 +56,15 @@ class ChapterViewSet(viewsets.ModelViewSet):
         novel = serializer.validated_data["novel"]
         if novel.author != self.request.user:
             raise PermissionDenied("只能向自己的作品新增章节")
-        serializer.save()
+        chapter = serializer.save()
+        novel.last_open_module = Novel.Module.WRITING
+        novel.last_open_chapter_id = chapter.id
+        novel.save(update_fields=["last_open_module", "last_open_chapter_id", "updated_at"])
+
+    def perform_update(self, serializer):
+        chapter = serializer.save()
+        novel = chapter.novel
+        if novel.author == self.request.user:
+            novel.last_open_module = Novel.Module.WRITING
+            novel.last_open_chapter_id = chapter.id
+            novel.save(update_fields=["last_open_module", "last_open_chapter_id", "updated_at"])

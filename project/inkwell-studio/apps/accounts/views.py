@@ -1,3 +1,4 @@
+from django.contrib.auth import authenticate, login as auth_login
 from rest_framework import generics, permissions
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
@@ -20,6 +21,18 @@ class MeView(generics.RetrieveAPIView):
 
 class LoginView(TokenObtainPairView):
     throttle_classes = [LoginThrottle]
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+
+        if response.status_code == 200:
+            username = request.data.get("username")
+            password = request.data.get("password")
+            user = authenticate(request=request, username=username, password=password)
+            if user is not None:
+                auth_login(request, user)
+
+        return response
 
 
 class RefreshView(TokenRefreshView):

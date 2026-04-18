@@ -12,16 +12,30 @@ class Novel(TimeStampedModel):
         LINK = "link", "链接可见"
         PUBLIC = "public", "公开"
 
+    class Module(models.TextChoices):
+        WRITING = "writing", "正文"
+        OUTLINE = "outline", "大纲"
+        CHARACTERS = "characters", "人物"
+        WORLDBUILDING = "worldbuilding", "世界观"
+        APPEARANCE = "appearance", "外观定制"
+        SETTINGS = "settings", "工作区设置"
+
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="novels")
     title = models.CharField(max_length=200)
     summary = models.TextField(blank=True)
     visibility = models.CharField(max_length=16, choices=Visibility.choices, default=Visibility.PRIVATE)
+    last_open_module = models.CharField(max_length=24, choices=Module.choices, default=Module.WRITING)
+    last_open_chapter_id = models.PositiveIntegerField(null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
+        return self.title
+
+    @property
+    def workspace_name(self) -> str:
         return self.title
 
 

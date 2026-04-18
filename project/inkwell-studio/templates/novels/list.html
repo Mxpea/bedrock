@@ -1,18 +1,18 @@
 {% extends 'base.html' %}
 
-{% block title %}作品 - Bedrock{% endblock %}
+{% block title %}发现工作区 - Bedrock{% endblock %}
 
 {% block content %}
-<section class="card card-wide">
-    <p class="eyebrow">作品</p>
-    <h1>小说列表</h1>
-    <p class="lead">作品页通过前端脚本加载 API 数据，模板与样式独立维护。</p>
+<section class="card card-wide workspace-hero">
+    <p class="eyebrow">Discover</p>
+    <h1>公开工作区</h1>
+    <p class="lead">在这里发现其他作者公开发布的工作区，直接进入阅读页或跳转到作者主页。</p>
 </section>
 
-<section class="feature-grid" data-novel-list>
-    <article class="card">
+<section class="feature-grid" data-workspace-discover>
+    <article class="card workspace-empty-card">
         <h2>正在加载</h2>
-        <p>脚本会在页面加载后拉取你的作品数据。</p>
+        <p>脚本会在页面加载后拉取公开工作区数据。</p>
     </article>
 </section>
 {% endblock %}

@@ -71,6 +71,8 @@ DATABASES = {
 }
 
 AUTH_USER_MODEL = "accounts.User"
+LOGIN_URL = "/login/"
+LOGIN_REDIRECT_URL = "/dashboard/"
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -106,7 +108,6 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_THROTTLE_CLASSES": (
-        "apps.core.throttling.LoginThrottle",
         "apps.core.throttling.BurstUserThrottle",
     ),
     "DEFAULT_THROTTLE_RATES": {

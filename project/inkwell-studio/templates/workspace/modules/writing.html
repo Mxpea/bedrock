@@ -1,0 +1,118 @@
+{% load static %}
+
+<div class="editor-workspace fade-in">
+    <!-- 1. 左侧：章节树状列表 (Upstream) -->
+    <aside class="editor-left-panel">
+        <details class="chapter-fold" open>
+            <summary class="chapter-fold-summary">
+                <span class="eyebrow" style="margin: 0;">正文章节</span>
+                <button class="icon-btn small" id="btn-new-chapter" title="新建章节" style="font-size: 1rem; border: none; background: transparent; cursor: pointer;">+</button>
+            </summary>
+            <div class="chapter-list-nav" id="chapter-list-container">
+                <p class="text-muted" style="text-align: center; margin-top: 24px; font-size: 0.85rem;">加载中...</p>
+            </div>
+        </details>
+    </aside>
+
+    <!-- 2. 中间：Markdown 编辑器 (Downstream) -->
+    <main class="editor-write-pane">
+        <div class="editor-toolbar">
+            <div class="tool-group flex-wrap">
+                <!-- 基础格式 -->
+                <button class="tool-btn" data-start="**" data-end="**" title="加粗 (Ctrl+B)"><b>B</b></button>
+                <button class="tool-btn" data-start="*" data-end="*" title="斜体 (Ctrl+I)"><i>I</i></button>
+                <button class="tool-btn" data-start="~~" data-end="~~" title="删除线"><s>S</s></button>
+                <div class="divider"></div>
+                <!-- 块级元素 -->
+                <button class="tool-btn txt-icon" data-prefix="# " title="一级标题">H1</button>
+                <button class="tool-btn txt-icon" data-prefix="## " title="二级标题">H2</button>
+                <button class="tool-btn txt-icon" data-prefix="> " title="引用块">”</button>
+                <button class="tool-btn txt-icon" data-prefix="- " title="无序列表">•</button>
+                <div class="divider"></div>
+                <!-- 扩展语法交互 -->
+                <button class="tool-btn syntax-custom" data-start="{高亮|" data-end="}" title="插入特殊高亮块">{高亮}</button>
+                <button class="tool-btn syntax-custom" data-start="{波浪|" data-end="}" title="文字波浪下划线">{波浪}</button>
+                <button class="tool-btn syntax-custom" data-start="{抖动|" data-end="}" title="文字随机抖动，营造慌张感">{抖动}</button>
+                <button class="tool-btn syntax-custom" data-start="{晃动|" data-end="}" title="文字上下波浪形晃动">{晃动}</button>
+                <!-- 数据库插入 -->
+                <button class="tool-btn txt-icon" title="引用快捷键" style="color: var(--accent); font-weight: bold;" disabled>@ 引用</button>
+                <div class="divider"></div>
+                <!-- 字体选择器 -->
+                <select id="font-selector" class="tool-select" title="选择并应用自定义字体">
+                    <option value="">选择字体...</option>
+                </select>
+                <button id="upload-font-btn" class="icon-btn" title="上传字体" style="font-size: 1rem; border: none; background: transparent; cursor: pointer;">↑</button>
+            </div>
+            
+            <div class="tool-group right">
+                <span class="editor-context" id="editor-workspace-label">工作区</span>
+                <button class="icon-btn" id="btn-toggle-workspace-nav" title="折叠工作区导航" style="border: none; background: transparent; cursor: pointer;"><i class="ph ph-layout"></i></button>
+                <span class="status-msg text-muted" id="save-status" style="font-size: 0.8rem; margin-right: 12px;"></span>
+                <button class="button secondary small" id="btn-preview">阅读预览</button>
+                <button class="button primary small" id="btn-save">保存</button>
+                <button class="icon-btn" id="btn-toggle-side" title="切换辅助面板" style="border: none; background: transparent; cursor: pointer;"><i class="ph ph-sidebar-simple"></i></button>
+            </div>
+        </div>
+        
+        <div class="editor-scroll-area" style="flex: 1; overflow-y: auto;">
+            <div class="editor-body">
+                <input type="text" id="chapter-title-input" class="chapter-title-input" value="" placeholder="输入章节标题..." autocomplete="off"/>
+                <textarea id="main-editor-area" class="chapter-content-input" placeholder="在这里开始创作正文..."></textarea>
+            </div>
+        </div>
+    </main>
+
+    <!-- 3. 右侧：可收缩侧边栏 (Context) -->
+    <aside class="editor-side-panel" id="editor-right-panel">
+        <div class="panel-tabs">
+            <button class="tab-btn active" data-target="tab-info" title="章节信息">ℹ️ 信息</button>
+            <button class="tab-btn" data-target="tab-comments" title="本章吐槽">💬 吐槽</button>
+            <button class="tab-btn" data-target="tab-quotes" title="快速引用">🔗 引用</button>
+        </div>
+        <div class="panel-content">
+            <!-- Info Tab -->
+            <div id="tab-info" class="tab-pane active" style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="background: var(--bg); padding: 12px; border-radius: 8px; border: 1px solid var(--line);">
+                    <p id="word-count" style="font-size: 0.85rem; margin: 0 0 4px; font-weight: bold; color: var(--accent);">字数：0</p>
+                    <p id="chapter-status" class="text-muted" style="font-size: 0.8rem; margin: 0;">状态：加载中</p>
+                </div>
+            </div>
+            
+            <!-- Comments Tab (Placeholder) -->
+            <div id="tab-comments" class="tab-pane" style="display: none;">
+                <p class="text-muted" style="font-size: 0.85rem; text-align: center; margin-top: 2rem;">暂无吐槽。<br>读者划线评论将在这里显示。</p>
+            </div>
+            
+            <!-- Quotes Tab (Placeholder) -->
+            <div id="tab-quotes" class="tab-pane" style="display: none;">
+                <p class="text-muted" style="font-size: 0.85rem; text-align: center; margin-top: 2rem;">当前工作区的人物、世界观设定<br>可在这里搜索拖曳引用。</p>
+            </div>
+        </div>
+    </aside>
+</div>
+
+<!-- Upload Font Modal -->
+<dialog id="font-upload-modal" class="modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0;">上传自定义字体</h3>
+        <p class="text-muted">支持 .ttf, .otf, .woff 或 .woff2 格式格式。上传后可以在编辑器内通过下拉框快速应用。</p>
+        <form id="font-upload-form" class="stack-form">
+            <label>
+                <span>字体名称</span>
+                <input type="text" name="name" required placeholder="例如：汉仪文黑">
+            </label>
+            <label>
+                <span>字体文件 (.ttf/.otf/.woff2)</span>
+                <input type="file" name="font_file" accept=".ttf,.otf,.woff,.woff2" required>
+            </label>
+            <div class="form-actions mt-3">
+                <button type="button" class="button secondary btn-cancel">取消</button>
+                <button type="submit" class="button primary">上传并加载</button>
+            </div>
+            <p id="font-upload-msg" class="form-message"></p>
+        </form>
+    </div>
+</dialog>
+
+<link rel="stylesheet" href="{% static 'css/editor.css' %}">
+<script src="{% static 'js/editor.js' %}"></script>

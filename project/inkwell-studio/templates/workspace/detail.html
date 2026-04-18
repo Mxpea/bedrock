@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ workspace.title }} - 工作区{% endblock %}
+
+{% block content %}
+<div data-workspace-context data-workspace-id="{{ workspace.id }}" data-workspace-title="{{ workspace.title }}" data-workspace-module="{{ module }}" data-workspace-chapter-id="{% if active_chapter %}{{ active_chapter.id }}{% endif %}"></div>
+<section id="workspace-shell" class="workspace-shell {% if module == 'writing' %}workspace-shell-writing{% endif %}">
+    <aside id="workspace-sidebar" class="workspace-sidebar">
+        <h2 class="workspace-name">{{ workspace.title }}</h2>
+        <details class="workspace-group-fold" open>
+            <summary class="workspace-group-title">创作模块</summary>
+            <div class="workspace-group">
+                <a class="workspace-nav-item {% if module == 'writing' %}active{% endif %}" href="/workspace/{{ workspace.id }}/writing/">📖 正文</a>
+                <a class="workspace-nav-item {% if module == 'outline' %}active{% endif %}" href="/workspace/{{ workspace.id }}/outline/">🗺️ 大纲</a>
+                <a class="workspace-nav-item {% if module == 'characters' %}active{% endif %}" href="/workspace/{{ workspace.id }}/characters/">👥 人物</a>
+                <a class="workspace-nav-item {% if module == 'worldbuilding' %}active{% endif %}" href="/workspace/{{ workspace.id }}/worldbuilding/">🌍 世界观</a>
+            </div>
+        </details>
+        <details class="workspace-group-fold" open>
+            <summary class="workspace-group-title">工作区管理</summary>
+            <div class="workspace-group">
+                <a class="workspace-nav-item {% if module == 'appearance' %}active{% endif %}" href="/workspace/{{ workspace.id }}/appearance/">🎨 外观定制</a>
+                <a class="workspace-nav-item {% if module == 'settings' %}active{% endif %}" href="/workspace/{{ workspace.id }}/settings/">⚙️ 工作区设置</a>
+            </div>
+        </details>
+        <details class="workspace-group-fold" open>
+            <summary class="workspace-group-title">导航</summary>
+            <div class="workspace-group">
+                <a class="workspace-nav-item" href="/dashboard/">← 返回工作台</a>
+            </div>
+        </details>
+    </aside>
+
+    <main class="workspace-content {% if module == 'writing' %}workspace-content-writing{% endif %}">
+        {% if module != 'writing' %}
+        <div class="workspace-breadcrumb">工作区：{{ workspace.title }} / {{ module_label }}</div>
+        {% endif %}
+
+        {% if module == 'writing' %}
+        {% include 'workspace/modules/writing.html' %}
+        {% elif module == 'outline' %}
+        <section class="workspace-panel">
+            <h1>大纲</h1>
+            <p class="lead">已切换为工作区内大纲模块。后续可以扩展树形大纲与思维导图双视图。</p>
+        </section>
+        {% elif module == 'characters' %}
+        <section class="workspace-panel">
+            <h1>人物</h1>
+            <p class="lead">已切换为工作区内人物模块。后续可以扩展卡片墙、详情抽屉与关系图谱。</p>
+        </section>
+        {% elif module == 'worldbuilding' %}
+        <section class="workspace-panel">
+            <h1>世界观</h1>
+            <p class="lead">已切换为工作区内世界观模块。后续可以扩展结构化 Wiki 与引用追踪。</p>
+        </section>
+        {% elif module == 'appearance' %}
+        <section class="workspace-panel">
+            <h1>外观定制</h1>
+            <p class="lead">该入口已经绑定到工作区。后续可接入可视化装修器，实时预览当前工作区章节。</p>
+        </section>
+        {% elif module == 'settings' %}
+        <section class="workspace-panel">
+            <h1>工作区设置</h1>
+            <p class="lead">可见性、封面、简介和预览链接将在这里统一管理。</p>
+            <div class="workspace-card">
+                <p><strong>工作区名称：</strong>{{ workspace.title }}</p>
+                <p><strong>简介：</strong>{{ workspace.summary|default:"暂无简介" }}</p>
+                <p><strong>可见性：</strong>{{ workspace.get_visibility_display }}</p>
+            </div>
+        </section>
+        {% endif %}
+    </main>
+</section>
+{% endblock %}

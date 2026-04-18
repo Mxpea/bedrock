@@ -72,7 +72,7 @@
             <p>没有找到可访问的已发布章节。你可以先去作品页创建并发布章节，或从公开作品进入阅读。</p>
             <div class="reader-empty-actions">
                 <a class="nav-btn index" href="/novels/">前往作品列表</a>
-                <a class="nav-btn index" href="/editor/">进入编辑器</a>
+                <a class="nav-btn index" href="/dashboard/">进入工作台</a>
             </div>
         </section>
         {% endif %}
@@ -103,6 +103,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     applyCharAnimations('.mk-jitter', 'jitter');
     applyCharAnimations('.mk-wobble', 'wobble');
+
+    document.querySelectorAll('.mk-custom-font[data-font]').forEach((el) => {
+        const fontName = (el.getAttribute('data-font') || '').trim();
+        if (fontName) {
+            el.style.fontFamily = `"${fontName}", sans-serif`;
+        }
+    });
 });
 </script>
 

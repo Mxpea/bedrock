@@ -4,337 +4,83 @@
 {% block title %}作者主页 - Bedrock{% endblock %}
 
 {% block content %}
-<div class="profile-layout fade-in">
-    <!-- Header Banner & Avatar -->
-    <header class="profile-header">
-        <div class="banner"></div>
-        <div class="profile-meta">
-            <div class="avatar-wrap">
-                <div class="avatar">{{ profile_user.username|make_list|first|upper }}</div>
+<div class="author-profile">
+    <!-- 1. 顶部头图区 -->
+    <section class="profile-hero">
+        <div class="profile-cover"></div>
+        <div class="profile-hero-content wrapper">
+            <div class="profile-avatar">
+                <div class="avatar-placeholder">{{ profile_user.username|make_list|first|upper }}</div>
             </div>
             <div class="profile-info">
-                <h1 id="author-name">{{ profile_user.username }} <span class="badge advanced">{% if profile_user.role == 'author' %}创作者{% elif profile_user.role == 'admin' %}管理员{% else %}读者{% endif %}</span></h1>
-                <p class="bio">“在赛博废墟中寻找旧神的文字。”</p>
-                <div class="stats">
-                    <span id="stat-novels"><strong>-</strong> 部作品</span>
-                    <span><strong>-</strong> 个收藏</span>
-                    <span><strong>-</strong> 字创作</span>
-                </div>
+                <h1>{{ profile_user.username }} <span class="badge author-badge">Author</span></h1>
+                <p class="profile-bio">{{ profile_user.profile.bio|default:"这个人很懒，什么都没留下。" }}</p>
             </div>
             <div class="profile-actions">
                 {% if is_owner %}
-                <button class="button secondary" onclick="alert('这是供别人访问的URL: ' + window.location.href)">分享我的主页</button>
-                <a href="/dashboard/" class="button primary">进入工作台</a>
-                {% else %}
-                <button class="button primary" disabled>关注功能开发中</button>
+                <button class="button secondary" onclick="alert('装修功能开发中...')"><i class="ph ph-paint-brush"></i> 装修主页</button>
+                <a href="/dashboard/" class="button secondary"><i class="ph ph-kanban"></i> 进入工作台</a>
+                <a href="#" class="button secondary" onclick="navigator.clipboard.writeText(window.location.href); alert('主页链接已复制')">复制主页链接</a>
                 {% endif %}
             </div>
         </div>
-    </header>
+    </section>
 
-    <!-- Main Content Area -->
-    <div class="profile-content">
-        <aside class="sidebar">
-            <div class="box info-box">
-                <h3>关于作者</h3>
-                <p>该用户的个人简介正在同步中...</p>
-                <hr>
-                <div class="social-links">
-                    <span class="text-muted">暂无绑定的社交账号</span>
+    <!-- 2. 数据展示条 -->
+    <section class="profile-stats card wrapper" style="margin-top: -30px; position: relative; z-index: 10; display: flex; gap: 2rem; padding: 1rem 2rem;">
+        <div class="stat-item" style="display: flex; flex-direction: column; align-items: center;">
+            <span class="stat-value" style="font-size: 1.5rem; font-weight: bold; color: var(--color-base-100);">{{ public_workspaces_count }}</span>
+            <span class="stat-label" style="font-size: 0.8rem; color: var(--color-base-60);">公开工作区</span>
+        </div>
+        <div class="stat-item" style="display: flex; flex-direction: column; align-items: center;">
+            <span class="stat-value" style="font-size: 1.5rem; font-weight: bold; color: var(--color-base-100);">{{ public_chapters_count }}</span>
+            <span class="stat-label" style="font-size: 0.8rem; color: var(--color-base-60);">公开章节数</span>
+        </div>
+        <div class="stat-item" style="display: flex; flex-direction: column; align-items: center;">
+            <span class="stat-value" style="font-size: 1.5rem; font-weight: bold; color: var(--color-base-100);">{{ days_joined }}</span>
+            <span class="stat-label" style="font-size: 0.8rem; color: var(--color-base-60);">加入天数</span>
+        </div>
+    </section>
+
+    <!-- 3. 自定义模块区域：作品陈列柜 -->
+    <section class="profile-module wrapper" style="margin-top: 2rem;">
+        <div class="module-header" style="margin-bottom: 1rem;">
+            <h2>📚 作品陈列柜</h2>
+            <p class="eyebrow" style="color: var(--color-base-50); font-size: 0.8rem;">Public Workspaces</p>
+        </div>
+        
+        <div class="feature-grid profile-workspace-grid">
+            {% for workspace in workspaces %}
+            <article class="card workspace-card">
+                <div class="workspace-card-top">
+                    <div>
+                        <p class="eyebrow">Workspace</p>
+                        <h2 style="margin: 0; font-size: 1.2rem;">{{ workspace.title }}</h2>
+                    </div>
+                    <span class="badge">{{ workspace.get_visibility_display }}</span>
                 </div>
-            </div>
-        </aside>
-
-        <main class="works-grid">
-            <h2 class="section-heading">代表作品 ({{ novels|length }})</h2>
-            <div class="grid-wrap" id="author-works-container">
-                {% for novel in novels %}
-                <article class="work-card" style="align-items: center;">
-                    <div class="book-cover type-{{ forloop.counter|default:1|slice:':1' }}">{{ novel.title|slice:":2" }}</div>
-                    <div class="work-info" style="flex: 1;">
-                        <h3 style="margin-bottom: 4px;">{{ novel.title }}</h3>
-                        <p class="desc" style="color: var(--muted); font-size: 0.95rem; margin-bottom: 12px; line-height: 1.5;">{{ novel.summary|default:"暂无简介" }}</p>
-                        <div class="work-meta" style="font-size: 0.85rem;">
-                            <span class="status {% if novel.visibility == 'public' %}text-green{% else %}text-muted{% endif %}">{{ novel.get_visibility_display }}</span>
-                            <span>•</span>
-                            <span>{{ novel.created_at|date:"Y-m-d" }}</span>
-                        </div>
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 8px; justify-content: center; min-width: 100px;">
-                        <a href="/reader/?novel_id={{ novel.id }}" class="button secondary small" style="text-align: center; display: block; padding: 6px 0; text-decoration: none;">直接阅读</a>
-                        <button class="button small" onclick="alert('分享作品链接：' + window.location.origin + '/reader/?novel_id={{ novel.id }}')" style="background: var(--bg-soft); border: 1px solid var(--line); cursor: pointer;">复制链接</button>
-                    </div>
-                </article>
-                {% empty %}
-                <article class="work-card">
-                    <div class="work-info" style="width: 100%; text-align: center; padding: 48px 0;">
-                        <h3 style="color: var(--muted); font-size: 1.1rem;">作者暂无公开作品</h3>
-                    </div>
-                </article>
-                {% endfor %}
-            </div>
-        </main>
-    </div>
+                <p class="workspace-card-summary" style="margin: 1rem 0; color: var(--color-base-70);">{{ workspace.summary|default:"暂无简介"|truncatechars:100 }}</p>
+                <div class="workspace-card-meta" style="font-size: 0.8rem; color: var(--color-base-50); margin-bottom: 1rem;">
+                    <span>更新于 {{ workspace.updated_at|date:"Y-m-d H:i" }}</span>
+                </div>
+                <div class="actions">
+                    {% if workspace.visibility == 'public' or is_owner %}
+                    <a href="/reader/?workspace_id={{ workspace.id }}" class="button primary">阅读</a>
+                    {% endif %}
+                    {% if is_owner %}
+                    <a href="/workspace/{{ workspace.id }}/writing/" class="button secondary">进入工作区</a>
+                    {% endif %}
+                </div>
+            </article>
+            {% empty %}
+            <article class="card workspace-empty-card" style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
+                <div class="empty-state">
+                    <h3 style="color: var(--color-base-60);">暂无公开工作区</h3>
+                    <p style="color: var(--color-base-50);">{% if is_owner %}调整工作区设置为“公开”后将展示在此。{% else %}该作者正在酝酿大作。{% endif %}</p>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    // Update works count
-    const countEl = document.getElementById('stat-novels');
-    if (countEl) countEl.innerHTML = `<strong>{{ novels|length }}</strong> 部作品`;
-});
-</script>
-
-<style>
-/* Personal Profile Specific Styles */
-.profile-layout {
-    width: 100%;
-    margin-top: -56px; 
-    padding-bottom: 80px;
-}
-
-.profile-header {
-    background: var(--bg);
-    border-bottom: 1px solid var(--line);
-    margin-bottom: 32px;
-    transition: background 0.4s ease, border-color 0.4s ease;
-}
-
-.banner {
-    height: 240px;
-    background: linear-gradient(135deg, var(--accent), #56728a);
-    width: 100%;
-    position: relative;
-    overflow: hidden;
-}
-.banner::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4xNSkiLz48L3N2Zz4=');
-    background-size: 20px 20px;
-}
-
-.profile-meta {
-    max-width: 1080px;
-    margin: 0 auto;
-    padding: 0 32px 32px;
-    display: flex;
-    align-items: flex-end;
-    gap: 24px;
-    position: relative;
-    top: -48px;
-}
-
-.avatar-wrap {
-    width: 132px;
-    height: 132px;
-    border-radius: 50%;
-    background: var(--bg);
-    padding: 6px;
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
-    flex-shrink: 0;
-    z-index: 2;
-    transition: background 0.4s ease;
-}
-
-.avatar {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    background: linear-gradient(45deg, #d3cce3, #e9e4f0);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 3rem;
-    font-weight: 800;
-    color: #333;
-    text-transform: uppercase;
-}
-
-.profile-info {
-    flex: 1;
-    padding-bottom: 8px;
-}
-
-.profile-info h1 {
-    font-size: 2.2rem;
-    margin: 0 0 8px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    color: var(--text);
-}
-
-.badge {
-    font-size: 0.8rem;
-    padding: 4px 10px;
-    border-radius: 99px;
-    background: var(--bg-soft);
-    color: var(--accent);
-    font-weight: 700;
-    vertical-align: middle;
-}
-.badge.advanced {
-    background: linear-gradient(135deg, #16324f, #335473);
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(22, 50, 79, 0.2);
-}
-
-.bio {
-    font-size: 1.1rem;
-    color: var(--muted);
-    margin: 0 0 16px;
-    max-width: 500px;
-}
-
-.stats {
-    display: flex;
-    gap: 20px;
-    font-size: 0.95rem;
-    color: #818f9e;
-}
-.stats strong {
-    color: var(--text);
-    font-size: 1.1rem;
-    font-weight: 800;
-}
-
-.profile-actions {
-    padding-bottom: 12px;
-    display: flex;
-    gap: 12px;
-}
-
-.profile-actions .icon-btn {
-    padding: 12px 16px;
-    font-family: inherit;
-}
-
-.profile-content {
-    max-width: 1080px;
-    margin: 0 auto;
-    padding: 0 32px 32px;
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    gap: 40px;
-}
-
-.box {
-    background: var(--bg);
-    border-radius: 20px;
-    padding: 24px;
-    border: 1px solid var(--line);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-}
-
-.box h3 {
-    margin: 0 0 16px;
-    font-size: 1.1rem;
-    color: var(--accent-strong);
-}
-
-.info-box p {
-    font-size: 0.95rem;
-    color: var(--muted);
-    line-height: 1.7;
-    margin: 0 0 12px;
-}
-.info-box hr { border: none; height: 1px; background: var(--line); margin: 20px 0; }
-.social-links { display: flex; gap: 12px; color: var(--muted); }
-.social-links a { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.9rem; }
-.social-links a:hover { text-decoration: underline; }
-
-.mt-3 { margin-top: 24px; }
-
-.tags { display: flex; flex-wrap: wrap; gap: 8px; }
-.tag { padding: 4px 12px; background: var(--bg-soft); color: var(--text); border-radius: 8px; font-size: 0.85rem; font-weight: 600; border: 1px solid var(--line); }
-
-/* Works Grid */
-.section-heading {
-    font-size: 1.4rem;
-    margin: 0 0 24px;
-    font-weight: 800;
-}
-
-.grid-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.work-card {
-    display: flex;
-    background: var(--bg);
-    border-radius: 20px;
-    border: 1px solid var(--line);
-    padding: 20px;
-    gap: 24px;
-    transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
-    position: relative;
-    cursor: default;
-}
-
-.work-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.12);
-    border-color: var(--accent);
-}
-
-.book-cover {
-    width: 120px;
-    flex-shrink: 0;
-    border-radius: 12px;
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1), 0 8px 16px -4px rgba(22, 50, 79, 0.15);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.8rem;
-    font-weight: 900;
-    color: rgba(255,255,255,0.9);
-    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    writing-mode: vertical-rl;
-    text-orientation: upright;
-    letter-spacing: 0.2rem;
-    padding: 16px 0;
-}
-
-/* Procedural Covers */
-.book-cover.type-1 { background: linear-gradient(145deg, #1c1f24, #2a3c54); }
-.book-cover.type-2 { background: linear-gradient(145deg, #8ba888, #4d6059); }
-.book-cover.type-3 { background: linear-gradient(145deg, #a66a56, #5c3832); }
-
-.work-info {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.work-info h3 { font-size: 1.4rem; margin: 0 0 8px; color: var(--accent-strong); font-weight: 800; }
-.work-info .desc { font-size: 1rem; color: var(--muted); margin: 0 0 16px; line-height: 1.6; max-width: 500px; }
-
-.work-meta { font-size: 0.9rem; font-weight: 600; color: #8fa0b3; display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
-.text-green { color: #2ea043; }
-
-.work-tags { display: flex; gap: 8px; margin-top: auto; flex-wrap: wrap; }
-.s-tag { padding: 2px 8px; font-size: 0.8rem; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); }
-
-.read-btn { display: inline-flex; align-items: center; padding: 0 16px; height: 36px; background: transparent; border: 1px solid var(--line); border-radius: 99px; color: var(--text); font-weight: 700; text-decoration: none; position: absolute; right: 24px; top: 24px; transition: all 0.2s; font-size: 0.9rem; }
-.read-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); transform: scale(1.02); }
-
-.fade-in { animation: fadeIn 0.6s ease-out forwards; }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-@media (max-width: 900px) {
-    .profile-content { grid-template-columns: 1fr; gap: 24px; }
-    .profile-meta { flex-direction: column; align-items: center; text-align: center; top: -64px; padding: 0 24px 24px; }
-    .profile-actions { justify-content: center; margin-top: 16px; }
-    .stats { justify-content: center; }
-    .work-card { flex-direction: column; align-items: center; text-align: center; padding: 32px 20px; }
-    .read-btn { position: relative; right: auto; top: auto; margin-top: 16px; }
-    .work-tags, .work-meta { justify-content: center; }
-    .book-cover { width: 140px; height: 200px; writing-mode: horizontal-tb; text-orientation: mixed; padding: 0; margin-bottom: 8px; }
-    .bio { font-size: 1rem; }
-}
-</style>
 {% endblock %}

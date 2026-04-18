@@ -2,11 +2,21 @@ from django.contrib import admin
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from config.views import DashboardPageView, HomePageView, LoginPageView, NovelListPageView, RegisterPageView, EditorPageView, ReaderPageView, AuthorProfilePageView
+from config.views import (
+    AuthorProfilePageView,
+    DashboardPageView,
+    HomePageView,
+    LoginPageView,
+    NovelListPageView,
+    ReaderPageView,
+    RegisterPageView,
+    WorkspacePageView,
+)
 from apps.novels.views import ChapterViewSet, NovelViewSet
 
 router = DefaultRouter()
 router.register(r"novels", NovelViewSet, basename="novel")
+router.register(r"workspaces", NovelViewSet, basename="workspace")
 router.register(r"chapters", ChapterViewSet, basename="chapter")
 
 urlpatterns = [
@@ -14,8 +24,9 @@ urlpatterns = [
     path("login/", LoginPageView.as_view(), name="login-page"),
     path("register/", RegisterPageView.as_view(), name="register-page"),
     path("dashboard/", DashboardPageView.as_view(), name="dashboard-page"),
+    path("workspace/<int:workspace_id>/", WorkspacePageView.as_view(), name="workspace-page"),
+    path("workspace/<int:workspace_id>/<str:module>/", WorkspacePageView.as_view(), name="workspace-module-page"),
     path("novels/", NovelListPageView.as_view(), name="novels-page"),
-    path("editor/", EditorPageView.as_view(), name="editor-page"),
     path("reader/", ReaderPageView.as_view(), name="reader-page"),
     path("reader/<int:chapter_id>/", ReaderPageView.as_view(), name="reader-chapter-page"),
     path("u/<str:username>/", AuthorProfilePageView.as_view(), name="author-profile-page"),

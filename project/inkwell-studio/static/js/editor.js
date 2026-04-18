@@ -1,0 +1,415 @@
+
+document.addEventListener('DOMContentLoaded', () => {
+    const editor = document.getElementById('main-editor-area');
+    if (!editor) {
+        return;
+    }
+    
+    // Auto-resize textarea
+    const resizeEditor = () => {
+        editor.style.height = 'auto';
+        editor.style.height = editor.scrollHeight + 'px';
+    };
+    editor.addEventListener('input', resizeEditor);
+    // Initial resize map slightly later to ensure rendering is complete
+    setTimeout(resizeEditor, 10);
+
+    // Generic formatting wrapping logic for Markdown tags
+    const insertTag = (startTag, endTag) => {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const text = editor.value;
+        const selectedText = text.substring(start, end);
+        const replacement = startTag + selectedText + endTag;
+        
+        editor.value = text.substring(0, start) + replacement + text.substring(end);
+        
+        // Adjust cursor intelligently
+        if (start === end) {
+            editor.selectionStart = editor.selectionEnd = start + startTag.length;
+        } else {
+            editor.selectionStart = editor.selectionEnd = start + replacement.length;
+        }
+        editor.focus();
+        resizeEditor();
+    };
+
+    // Generic logic specifically for block prefixes like H1 (# ), Lists (- )
+    const insertPrefix = (prefix) => {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const text = editor.value;
+        
+        // Find the absolute start of the current active line
+        let lineStart = text.lastIndexOf('\n', start - 1);
+        lineStart = (lineStart === -1) ? 0 : lineStart + 1;
+        
+        editor.value = text.substring(0, lineStart) + prefix + text.substring(lineStart);
+        
+        // Preserve user selection cursor movement
+        editor.selectionStart = start + prefix.length;
+        editor.selectionEnd = end + prefix.length;
+        editor.focus();
+        resizeEditor();
+    };
+
+    // Auto script binder for ALL toolbar buttons driven by pure data attributes!
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const { start, end, prefix } = btn.dataset;
+            if (start !== undefined && end !== undefined) {
+                insertTag(start, end);
+            } else if (prefix !== undefined) {
+                insertPrefix(prefix);
+            }
+        });
+    });
+
+    // Capture Ctrl+B, Ctrl+I for shortcuts
+    editor.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey) {
+            if (e.key === 'b' || e.key === 'B') {
+                e.preventDefault();
+                insertTag('**', '**');
+            }
+            if (e.key === 'i' || e.key === 'I') {
+                e.preventDefault();
+                insertTag('*', '*');
+            }
+        }
+    });
+
+    // Capture Tab for indentation in textarea
+    editor.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            insertTag('    ', '');
+        }
+    });
+
+    // Custom Font Logic
+    const fontSelector = document.getElementById('font-selector');
+    const uploadFontBtn = document.getElementById('upload-font-btn');
+    const fontModal = document.getElementById('font-upload-modal');
+    const fontForm = document.getElementById('font-upload-form');
+    const fontUploadMsg = document.getElementById('font-upload-msg');
+
+    // Editor data implementation
+    const titleInput = document.getElementById('chapter-title-input');
+    const wordCount = document.getElementById('word-count');
+    const saveStatus = document.getElementById('save-status');
+    const btnSave = document.getElementById('btn-save');
+    const btnPreview = document.getElementById('btn-preview');
+    const workspaceLabel = document.getElementById('editor-workspace-label');
+    const breadcrumb = document.getElementById('editor-breadcrumb');
+    const btnBackWorkspace = document.getElementById('btn-back-workspace');
+    const btnToggleWorkspaceNav = document.getElementById('btn-toggle-workspace-nav');
+    const btnToggleSide = document.getElementById('btn-toggle-side');
+    const editorRightPanel = document.getElementById('editor-right-panel');
+    const chapterStatus = document.getElementById('chapter-status');
+    const workspaceShell = document.getElementById('workspace-shell');
+    const workspaceSidebar = document.getElementById('workspace-sidebar');
+
+    const resolveWorkspaceContext = () => {
+        const params = new URLSearchParams(window.location.search);
+        const contextNode = document.querySelector('[data-workspace-context]');
+        const fromData = contextNode ? contextNode.dataset.workspaceId : null;
+        const fromWindow = window.BEDROCK_WORKSPACE && window.BEDROCK_WORKSPACE.id ? String(window.BEDROCK_WORKSPACE.id) : null;
+        const fromQuery = params.get('workspace_id') || params.get('novel_id');
+        const pathMatch = window.location.pathname.match(/^\/workspace\/(\d+)\//);
+        const fromPath = pathMatch ? pathMatch[1] : null;
+
+        return {
+            id: fromWindow || fromData || fromQuery || fromPath,
+            title: (window.BEDROCK_WORKSPACE && window.BEDROCK_WORKSPACE.title)
+                || (contextNode && contextNode.dataset.workspaceTitle)
+                || '当前工作区',
+        };
+    };
+    
+    let currentChapterId = new URLSearchParams(window.location.search).get('chapter_id');
+    const workspaceContext = resolveWorkspaceContext();
+    let currentNovelId = workspaceContext.id;
+    let isSaving = false;
+
+    if (workspaceLabel) {
+        workspaceLabel.textContent = `${workspaceContext.title} #${currentNovelId || '?'}`;
+    }
+
+    // Tabs toggle logic
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+            const targetId = btn.getAttribute('data-target');
+            btn.classList.add('active');
+            let pane = document.getElementById(targetId);
+            if (pane) pane.style.display = 'block';
+        });
+    });
+
+    // Right Sidebar toggle logic
+    if (btnToggleSide && editorRightPanel) {
+        btnToggleSide.addEventListener('click', () => {
+            editorRightPanel.classList.toggle('collapsed');
+        });
+    }
+
+    if (btnToggleWorkspaceNav && workspaceShell && workspaceSidebar) {
+        btnToggleWorkspaceNav.addEventListener('click', () => {
+            workspaceShell.classList.toggle('is-workspace-sidebar-collapsed');
+            const collapsed = workspaceShell.classList.contains('is-workspace-sidebar-collapsed');
+            btnToggleWorkspaceNav.title = collapsed ? '展开工作区导航' : '折叠工作区导航';
+        });
+    }
+
+    if (currentNovelId && btnBackWorkspace) {
+        btnBackWorkspace.href = `/workspace/${currentNovelId}/writing/`;
+    }
+
+    // Word count update
+    const updateWordCount = () => {
+        const text = editor.value || "";
+        wordCount.textContent = `字数：${text.replace(/\s/g, '').length}`;
+    };
+    editor.addEventListener('input', updateWordCount);
+
+    const checkAuth = () => localStorage.getItem("bedrock_access");
+
+    const loadChapterList = async (novelId) => {
+        const token = checkAuth();
+        if (!token || !novelId) return;
+        const container = document.getElementById('chapter-list-container');
+        try {
+            const res = await fetch(`/api/chapters/?novel=${novelId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (res.ok) {
+                const data = await res.json();
+                const chapters = data.results || data;
+                if (!chapters.length) {
+                    container.innerHTML = '<p class="text-muted" style="text-align:center; font-size: 0.85rem;">暂无章节</p>';
+                } else {
+                    container.innerHTML = chapters.map(ch => {
+                        const title = ch.title || '未命名';
+                        return `
+                        <button type="button" class="chapter-item ${String(ch.id) === String(currentChapterId) ? 'active' : ''}" data-chapter-id="${ch.id}">
+                            <i class="ph ph-file-text" style="margin-right: 4px; opacity: 0.6; font-size: 0.9em;"></i>${title}
+                        </button>`;
+                    }).join('');
+
+                    container.querySelectorAll('[data-chapter-id]').forEach((item) => {
+                        item.addEventListener('click', () => {
+                            const chapterId = item.getAttribute('data-chapter-id');
+                            window.location.href = `/workspace/${currentNovelId}/writing/?chapter_id=${chapterId}`;
+                        });
+                    });
+                }
+            }
+        } catch (e) {
+            container.innerHTML = '<p class="text-danger">加载失败</p>';
+        }
+    };
+
+    document.getElementById('btn-new-chapter')?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!currentNovelId) return alert('请先指定工作区');
+        window.location.href = `/workspace/${currentNovelId}/writing/`;
+    });
+
+    const loadChapter = async () => {
+        const token = checkAuth();
+        if (!token) return;
+        
+        try {
+            if (currentChapterId) {
+                const res = await fetch(`/api/chapters/${currentChapterId}/`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) {
+                    const data = await res.json();
+                    titleInput.value = data.title;
+                    editor.value = data.content_md;
+                    currentNovelId = data.novel;
+                    if (breadcrumb) breadcrumb.textContent = `工作区 ${data.workspace_name || '#' + data.novel} / ${data.title}`;
+                    if (chapterStatus) chapterStatus.textContent = `状态：${data.is_published ? '已发布' : '草稿'}`;
+                    resizeEditor();
+                    updateWordCount();
+                    loadChapterList(currentNovelId);
+                }
+            } else if (currentNovelId) {
+                // If no chapter_id is provided, still load workspace chapter list.
+                if (breadcrumb) breadcrumb.textContent = `工作区 #${currentNovelId} / 新章节`;
+                if (chapterStatus) chapterStatus.textContent = '状态：草稿';
+                loadChapterList(currentNovelId);
+            } else {
+                if (breadcrumb) breadcrumb.textContent = `未指定工作区`;
+                if (chapterStatus) chapterStatus.textContent = '状态：未指定工作区';
+                const container = document.getElementById('chapter-list-container');
+                if (container) {
+                    container.innerHTML = '<p class="text-muted" style="text-align:center; font-size: 0.85rem;">未指定工作区</p>';
+                }
+            }
+        } catch (err) {
+            console.error(err);
+            if (chapterStatus) chapterStatus.textContent = '状态：加载失败';
+        }
+    };
+
+    const saveChapter = async () => {
+        const token = checkAuth();
+        if (!token) {
+            if (saveStatus) saveStatus.textContent = '请先登录';
+            window.location.href = `/login/?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+            return;
+        }
+        if (isSaving || !currentNovelId) {
+            if (saveStatus && !currentNovelId) saveStatus.textContent = '未指定工作区';
+            return;
+        }
+
+        isSaving = true;
+        saveStatus.textContent = '保存中...';
+        btnSave.disabled = true;
+
+        const payload = {
+            title: titleInput.value || '未命名章节',
+            content_md: editor.value,
+            novel: currentNovelId
+        };
+
+        try {
+            const url = currentChapterId ? `/api/chapters/${currentChapterId}/` : '/api/chapters/';
+            const method = currentChapterId ? 'PUT' : 'POST';
+            
+            const res = await fetch(url, {
+                method,
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                if (!currentChapterId) {
+                    currentChapterId = data.id;
+                    window.history.replaceState({}, '', `/workspace/${currentNovelId}/writing/?chapter_id=${data.id}`);
+                }
+                const now = new Date();
+                saveStatus.textContent = `已自动保存 ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                if (breadcrumb) breadcrumb.textContent = `工作区 ${data.workspace_name || '#' + data.novel} / ${data.title}`;
+            } else {
+                saveStatus.textContent = '保存失败';
+            }
+        } catch (err) {
+            saveStatus.textContent = '网络错误';
+        }
+
+        isSaving = false;
+        btnSave.disabled = false;
+    };
+
+    if (btnSave) {
+        btnSave.addEventListener('click', saveChapter);
+    }
+    
+    // Auto-save every 30 seconds
+    setInterval(() => {
+        if (titleInput.value.trim() !== '' || editor.value.trim() !== '') {
+            saveChapter();
+        }
+    }, 30000);
+
+    // Ctrl+S / Cmd+S
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            saveChapter();
+        }
+    });
+
+    if (btnPreview) {
+        btnPreview.addEventListener('click', () => {
+        if (currentChapterId) {
+            const workspaceParam = currentNovelId ? `&workspace_id=${currentNovelId}` : '';
+            window.location.href = `/reader/?chapter_id=${currentChapterId}${workspaceParam}`;
+            return;
+        }
+        window.alert('请先保存章节后再预览。');
+        });
+    }
+
+    // Load initial data
+    loadChapter();
+
+    // Load available fonts into the select dropdown
+    const renderFontSelector = () => {
+        if (!window.bedrockCustomFonts) return;
+        
+        fontSelector.innerHTML = '<option value="">应用字体...</option>';
+        window.bedrockCustomFonts.forEach(font => {
+            const option = document.createElement('option');
+            option.value = font.name;
+            option.textContent = font.name;
+            option.style.fontFamily = `"${font.name}", sans-serif`;
+            fontSelector.appendChild(option);
+        });
+    };
+
+    window.addEventListener('bedrockFontsLoaded', renderFontSelector);
+    if (window.bedrockCustomFonts) renderFontSelector();
+
+    fontSelector.addEventListener('change', (e) => {
+        const fontName = e.target.value;
+        if (!fontName) return;
+        // Inject Custom Font Markdown Syntax
+        insertTag(`{字体:${fontName}|`, `}`);
+        e.target.value = ''; // Reset selection
+    });
+
+    if (uploadFontBtn && fontModal && fontForm && fontUploadMsg) {
+        uploadFontBtn.addEventListener('click', () => {
+        fontModal.showModal();
+        fontForm.reset();
+        fontUploadMsg.textContent = '';
+    });
+
+        const cancelBtn = fontModal.querySelector('.btn-cancel');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => fontModal.close());
+        }
+
+        fontForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const token = localStorage.getItem("bedrock_access");
+        if (!token) {
+            fontUploadMsg.textContent = '未登录，无法上传字体。';
+            return;
+        }
+
+        const formData = new FormData(fontForm);
+        fontUploadMsg.textContent = '上传中，请稍候...';
+
+        try {
+            const response = await fetch('/api/customization/fonts/', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (!response.ok) {
+                fontUploadMsg.textContent = '上传失败：' + response.statusText;
+                return;
+            }
+
+            fontUploadMsg.textContent = '上传成功！';
+            // Trigger global reload of fonts in site.js
+            if (window.loadCustomFonts) await window.loadCustomFonts(true);
+            fontModal.close();
+        } catch (error) {
+            fontUploadMsg.textContent = '网络错误。';
+        }
+    });
+    }
+
+});

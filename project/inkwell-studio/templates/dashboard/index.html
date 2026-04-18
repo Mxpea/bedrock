@@ -1,81 +1,24 @@
 {% extends 'base.html' %}
 
-{% block title %}创作工坊 - Bedrock{% endblock %}
+{% block title %}工作台 - Bedrock{% endblock %}
 
 {% block content %}
-<section class="panel-grid">
-    <article class="card card-wide">
-        <h1 class="dashboard-greeting">上午好，创作者 <span data-username-display></span></h1>
-    </article>
-    
-    <!-- 左侧区域：最近写作与新建 -->
-    <div style="display: flex; gap: 24px; width: 100%; flex-wrap: wrap;">
-        <div style="flex: 2; min-width: 300px; display: flex; flex-direction: column; gap: 24px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 12px;">
-                <h2 style="margin: 0; font-size: 1.5rem; font-weight: 800;">我的作品库</h2>
-                <button class="button primary small" onclick="createNovel()">+ 新建作品</button>
-            </div>
-            
-            <!-- 真实作品列表 (Grid) -->
-            <div class="feature-grid" data-novel-list>
-                <p class="muted" style="padding: 12px;">加载中...</p>
-            </div>
-        </div>
-
-        <!-- 右侧区域：快捷入口与状态 -->
-        <div style="flex: 1; min-width: 250px; display: flex; flex-direction: column; gap: 24px;">
-            <article class="card">
-                <h2>系统通知</h2>
-                <div style="padding: 12px; background: var(--bg-soft); border-radius: 8px; font-size: 0.95rem; color: var(--muted); text-align: center;">
-                    <p style="margin: 0;">暂无新通知</p>
-                </div>
-            </article>
-            
-            <article class="card" style="flex: 1;">
-                <h2>关联设定集 (Wiki)</h2>
-                <div style="padding: 24px 12px; border: 1px dashed var(--line); border-radius: 8px; text-align: center; color: var(--muted); display: flex; flex-direction: column; align-items: center; justify-content: center; height: calc(100% - 48px);">
-                    <div style="font-size: 2rem; margin-bottom: 12px; opacity: 0.5;">📚</div>
-                    <p style="margin: 0; font-weight: 500;">Wiki 系统开发中</p>
-                    <p style="margin: 8px 0 0; font-size: 0.85rem;">敬请期待更强大的设定联动功能</p>
-                </div>
-            </article>
-        </div>
+<section class="card card-wide workspace-hero">
+    <p class="eyebrow">Workspace</p>
+    <h1 class="dashboard-greeting">工作台</h1>
+    <p class="lead">每个项目都是独立工作区，正文、大纲、人物和世界观彼此隔离，不再跨作品共享。</p>
+    <div class="actions">
+        <a class="button primary" href="#" onclick="createWorkspace(event)">+ 新建工作区</a>
+        <a class="button secondary" href="/novels/">查看公开工作区</a>
     </div>
 </section>
 
-<!-- 隐藏原始的显示框供调试使用或保留结构 -->
-<pre class="json-box" data-current-user style="display: none;"></pre>
-<script>
-async function createNovel() {
-    const title = prompt("请输入新作品名称：");
-    if (!title) return;
-    
-    const token = localStorage.getItem("bedrock_access");
-    if (!token) return alert('未登录');
-    
-    try {
-        const res = await fetch("/api/novels/", {
-            method: "POST",
-            headers: { 
-                "Authorization": `Bearer ${token}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                title: title,
-                summary: "暂无简介",
-                visibility: "private"
-            })
-        });
-        
-        if (res.ok) {
-            const data = await res.json();
-            window.location.href = `/editor/?novel_id=${data.id}`;
-        } else {
-            alert('创建失败');
-        }
-    } catch (e) {
-        alert('网络错误');
-    }
-}
-</script>
+<section class="workspace-grid" data-workspace-list>
+    <article class="card workspace-empty-card">
+        <h2>正在加载工作区...</h2>
+        <p>稍候将展示你的全部工作区和最近编辑状态。</p>
+    </article>
+</section>
+
+<pre class="json-box" data-current-user style="display:none;"></pre>
 {% endblock %}
