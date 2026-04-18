@@ -1,0 +1,67 @@
+{% extends 'adminpanel/base.html' %}
+
+{% block title %}审核队列 - 管理员后台{% endblock %}
+{% block page_title %}审核队列{% endblock %}
+{% block page_subtitle %}高级权限申请、公开内容与举报处理统一入口{% endblock %}
+
+{% block content %}
+<section class="admin-card">
+    <h3>高级权限申请（Lv.3）</h3>
+    <table>
+        <thead><tr><th>申请人</th><th>申请时间</th><th>申请理由</th><th>测试工作区</th><th>操作</th></tr></thead>
+        <tbody>
+        {% for item in pending_css_requests %}
+            <tr>
+                <td><a href="{% url 'adminpanel:user-detail' item.applicant.id %}">{{ item.applicant.username }}</a></td>
+                <td>{{ item.created_at|date:'Y-m-d H:i' }}</td>
+                <td>{{ item.reason|truncatechars:80 }}</td>
+                <td>{% if item.novel %}<a href="{% url 'adminpanel:workspace-detail' item.novel.id %}">{{ item.novel.title }}</a>{% else %}账号级{% endif %}</td>
+                <td>
+                    <form method="post" class="inline">{% csrf_token %}
+                        <input type="hidden" name="action" value="review_css">
+                        <input type="hidden" name="request_id" value="{{ item.id }}">
+                        <input type="text" name="review_note" placeholder="审核意见（拒绝建议必填）" style="min-width: 220px;">
+                        <button type="submit" name="decision" value="approved" class="primary">通过</button>
+                        <button type="submit" name="decision" value="rejected" class="danger">拒绝</button>
+                    </form>
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="5" class="admin-muted">暂无待审申请</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section class="admin-card">
+    <h3>举报处理</h3>
+    <table>
+        <thead><tr><th>举报人</th><th>目标类型</th><th>关联对象</th><th>理由</th><th>操作</th></tr></thead>
+        <tbody>
+        {% for item in pending_reports %}
+            <tr>
+                <td>{% if item.reporter %}{{ item.reporter.username }}{% else %}匿名{% endif %}</td>
+                <td>{{ item.get_target_type_display }}</td>
+                <td>
+                    {% if item.workspace %}工作区：{{ item.workspace.title }}{% endif %}
+                    {% if item.chapter %}<div>章节：{{ item.chapter.title }}</div>{% endif %}
+                </td>
+                <td>{{ item.reason|truncatechars:100 }}</td>
+                <td>
+                    <form method="post" class="inline">{% csrf_token %}
+                        <input type="hidden" name="action" value="handle_report">
+                        <input type="hidden" name="report_id" value="{{ item.id }}">
+                        <input type="text" name="handle_note" placeholder="处理意见" style="min-width:160px;">
+                        <button type="submit" name="decision" value="resolve" class="primary">处理</button>
+                        <button type="submit" name="decision" value="delete_and_notify" class="warn">删内容并通知</button>
+                        <button type="submit" name="decision" value="ignore">忽略</button>
+                    </form>
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="5" class="admin-muted">暂无待处理举报</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

@@ -18,6 +18,17 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def validate_invite_code(self, value):
+        try:
+            from apps.adminpanel.models import PlatformSetting
+
+            setting = PlatformSetting.get_solo()
+            require_invite = setting.registration_mode == PlatformSetting.RegistrationMode.INVITE_ONLY
+        except Exception:
+            require_invite = False
+
+        if require_invite and not value:
+            raise serializers.ValidationError("当前站点仅支持邀请码注册")
+
         if not value:
             return value
         try:
@@ -51,4 +62,4 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "username", "email", "role", "date_joined"]
+        fields = ["id", "username", "email", "role", "custom_level", "is_staff", "is_superuser", "date_joined"]

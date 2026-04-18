@@ -1,8 +1,11 @@
 import os
 import uuid
+from io import BytesIO
 
+from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.utils.text import slugify
+from PIL import Image, ImageOps
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -44,11 +47,68 @@ class NovelViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        user = self.request.user
+        is_admin = user.is_superuser or user.is_staff or getattr(user, "role", "") == "admin"
+        if instance.is_locked and instance.author == user and not is_admin:
+            raise PermissionDenied("工作区已被锁定，暂不可修改")
+        serializer.save()
+
     def perform_destroy(self, instance):
         if instance.author != self.request.user:
             raise PermissionDenied("只有作者可以删除作品")
         instance.is_deleted = True
         instance.save(update_fields=["is_deleted", "updated_at"])
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def upload_icon(self, request, pk=None):
+        workspace = self.get_queryset().filter(id=pk, author=request.user).first()
+        if not workspace:
+            return Response({"detail": "工作区不存在或无权访问"}, status=status.HTTP_404_NOT_FOUND)
+
+        is_admin = request.user.is_superuser or request.user.is_staff or getattr(request.user, "role", "") == "admin"
+        if workspace.is_locked and workspace.author == request.user and not is_admin:
+            return Response({"detail": "工作区已被锁定，暂不可修改图标"}, status=status.HTTP_403_FORBIDDEN)
+
+        icon_file = request.FILES.get("icon")
+        if not icon_file:
+            return Response({"detail": "未上传图标文件"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not (icon_file.content_type or "").startswith("image/"):
+            return Response({"detail": "仅支持图片文件"}, status=status.HTTP_400_BAD_REQUEST)
+
+        max_size = 10 * 1024 * 1024
+        if icon_file.size > max_size:
+            return Response({"detail": "图标大小不能超过 10MB"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            image = Image.open(icon_file)
+            image = ImageOps.exif_transpose(image)
+            image = image.convert("RGBA")
+            icon_256 = ImageOps.fit(image, (256, 256), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+
+            output = BytesIO()
+            icon_256.save(output, format="PNG", optimize=True)
+            output.seek(0)
+        except Exception:
+            return Response({"detail": "图片处理失败，请上传有效图像"}, status=status.HTTP_400_BAD_REQUEST)
+
+        workspace_segment = str(pk or workspace.pk)
+        icon_name = f"workspace-icons/user_{request.user.id}/workspace_{workspace_segment}/icon-{uuid.uuid4().hex[:10]}.png"
+
+        if workspace.icon:
+            workspace.icon.delete(save=False)
+
+        workspace.icon.save(icon_name, ContentFile(output.read()), save=True)
+
+        serializer = self.get_serializer(workspace)
+        return Response({"icon_url": serializer.data.get("icon_url", "")}, status=status.HTTP_200_OK)
 
 
 class ChapterViewSet(viewsets.ModelViewSet):
@@ -66,12 +126,17 @@ class ChapterViewSet(viewsets.ModelViewSet):
         novel = serializer.validated_data["novel"]
         if novel.author != self.request.user:
             raise PermissionDenied("只能向自己的作品新增章节")
+        if novel.is_locked:
+            raise PermissionDenied("工作区已被锁定，暂不可新增章节")
         chapter = serializer.save()
         novel.last_open_module = Novel.Module.WRITING
         novel.last_open_chapter_id = chapter.id
         novel.save(update_fields=["last_open_module", "last_open_chapter_id", "updated_at"])
 
     def perform_update(self, serializer):
+        chapter_instance = self.get_object()
+        if chapter_instance.novel.is_locked:
+            raise PermissionDenied("工作区已被锁定，暂不可编辑章节")
         chapter = serializer.save()
         novel = chapter.novel
         if novel.author == self.request.user:
@@ -110,6 +175,8 @@ class ChapterViewSet(viewsets.ModelViewSet):
         novel = Novel.objects.filter(id=novel_id, author=request.user, is_deleted=False).first()
         if not novel:
             return Response({"detail": "工作区不存在或无权访问"}, status=status.HTTP_404_NOT_FOUND)
+        if novel.is_locked:
+            return Response({"detail": "工作区已被锁定，暂不可上传素材"}, status=status.HTTP_403_FORBIDDEN)
 
         image_file = request.FILES.get("image")
         if not image_file:

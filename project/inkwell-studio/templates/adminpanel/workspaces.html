@@ -1,0 +1,64 @@
+{% extends 'adminpanel/base.html' %}
+
+{% block title %}工作区管理 - 管理员后台{% endblock %}
+{% block page_title %}工作区管理{% endblock %}
+{% block page_subtitle %}跨作者查看、筛选、锁定与风险处置{% endblock %}
+
+{% block content %}
+<section class="admin-card">
+    <form method="get" class="inline">
+        <input type="text" name="q" placeholder="工作区名称 / 作者 / ID" value="{{ keyword }}">
+        <select name="visibility">
+            <option value="">全部可见性</option>
+            <option value="private" {% if visibility == 'private' %}selected{% endif %}>私密</option>
+            <option value="link" {% if visibility == 'link' %}selected{% endif %}>链接可见</option>
+            <option value="public" {% if visibility == 'public' %}selected{% endif %}>公开</option>
+        </select>
+        <label>从 <input type="date" name="start" value="{{ start }}"></label>
+        <label>到 <input type="date" name="end" value="{{ end }}"></label>
+        <button type="submit" class="primary">筛选</button>
+    </form>
+</section>
+
+<section class="admin-card">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>工作区</th>
+                <th>作者</th>
+                <th>可见性</th>
+                <th>章节数</th>
+                <th>更新时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for ws in page_obj %}
+            <tr>
+                <td>#{{ ws.id }}</td>
+                <td>
+                    <div><a href="{% url 'adminpanel:workspace-detail' ws.id %}">{{ ws.title }}</a></div>
+                    {% if ws.is_locked %}<span class="tag warn">已锁定</span>{% endif %}
+                </td>
+                <td><a href="{% url 'adminpanel:user-detail' ws.author.id %}">{{ ws.author.username }}</a></td>
+                <td>{{ ws.get_visibility_display }}</td>
+                <td>{{ ws.chapters.count }}</td>
+                <td>{{ ws.updated_at|date:'Y-m-d H:i' }}</td>
+                <td>
+                    <form method="post" class="inline">{% csrf_token %}
+                        <input type="hidden" name="workspace_id" value="{{ ws.id }}">
+                        <button type="submit" name="action" value="force_private" class="warn" onclick="return confirm('确认强制设为私密？')">强制私密</button>
+                        <button type="submit" name="action" value="toggle_lock" onclick="return confirm('确认切换锁定状态？')">{% if ws.is_locked %}解锁{% else %}锁定{% endif %}</button>
+                    </form>
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="7" class="admin-muted">没有符合条件的工作区</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="pagination admin-muted">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</div>
+</section>
+{% endblock %}

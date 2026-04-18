@@ -23,6 +23,8 @@ class Novel(TimeStampedModel):
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="novels")
     title = models.CharField(max_length=200)
     summary = models.TextField(blank=True)
+    icon = models.ImageField(upload_to="workspace_icons/", blank=True, null=True)
+    is_locked = models.BooleanField(default=False)
     visibility = models.CharField(max_length=16, choices=Visibility.choices, default=Visibility.PRIVATE)
     last_open_module = models.CharField(max_length=24, choices=Module.choices, default=Module.WRITING)
     last_open_chapter_id = models.PositiveIntegerField(null=True, blank=True)

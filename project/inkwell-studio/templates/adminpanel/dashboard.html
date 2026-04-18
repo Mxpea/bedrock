@@ -1,0 +1,87 @@
+{% extends 'adminpanel/base.html' %}
+
+{% block title %}仪表盘 - 管理员后台{% endblock %}
+{% block page_title %}仪表盘{% endblock %}
+{% block page_subtitle %}优先处理待办，再看全站运行指标{% endblock %}
+
+{% block content %}
+<section class="admin-grid">
+    <article class="stat-card">
+        <div class="stat-label">高级权限申请待审</div>
+        <div class="stat-value">{{ pending_css }}</div>
+    </article>
+    <article class="stat-card">
+        <div class="stat-label">举报待处理</div>
+        <div class="stat-value">{{ pending_reports }}</div>
+    </article>
+    <article class="stat-card">
+        <div class="stat-label">吐槽被举报</div>
+        <div class="stat-value">{{ reported_roasts }}</div>
+    </article>
+    <article class="stat-card">
+        <div class="stat-label">今日新增用户</div>
+        <div class="stat-value">{{ today_new_users }}</div>
+    </article>
+</section>
+
+<section class="admin-grid">
+    <article class="stat-card">
+        <div class="stat-label">今日新增工作区</div>
+        <div class="stat-value">{{ today_new_workspaces }}</div>
+    </article>
+    <article class="stat-card">
+        <div class="stat-label">今日公开章节</div>
+        <div class="stat-value">{{ today_public_chapters }}</div>
+    </article>
+    <article class="stat-card">
+        <div class="stat-label">今日新增吐槽</div>
+        <div class="stat-value">{{ today_roasts }}</div>
+    </article>
+    <article class="stat-card">
+        <div class="stat-label">快捷入口</div>
+        <div class="inline" style="margin-top:8px;">
+            <a class="btn" href="{% url 'adminpanel:settings' %}">生成邀请码</a>
+            <a class="btn" href="{% url 'adminpanel:reviews' %}">进入审核队列</a>
+        </div>
+    </article>
+</section>
+
+<div class="admin-columns">
+    <section class="admin-card">
+        <h3>最新工作区</h3>
+        <table>
+            <thead><tr><th>名称</th><th>作者</th><th>可见性</th><th>更新时间</th></tr></thead>
+            <tbody>
+            {% for item in recent_workspaces %}
+                <tr>
+                    <td><a href="{% url 'adminpanel:workspace-detail' item.id %}">{{ item.title }}</a></td>
+                    <td>{{ item.author.username }}</td>
+                    <td>{{ item.get_visibility_display }}</td>
+                    <td>{{ item.updated_at|date:'Y-m-d H:i' }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="4" class="admin-muted">暂无数据</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="admin-card">
+        <h3>最新高级权限申请</h3>
+        <table>
+            <thead><tr><th>申请人</th><th>工作区</th><th>状态</th></tr></thead>
+            <tbody>
+            {% for req in recent_css_requests %}
+                <tr>
+                    <td>{{ req.applicant.username }}</td>
+                    <td>{% if req.novel %}{{ req.novel.title }}{% else %}账号级{% endif %}</td>
+                    <td>{{ req.get_status_display }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="3" class="admin-muted">暂无申请</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</div>
+{% endblock %}

@@ -8,6 +8,14 @@ class NovelSerializer(serializers.ModelSerializer):
     workspace_name = serializers.CharField(source="title", read_only=True)
     visibility_label = serializers.CharField(source="get_visibility_display", read_only=True)
     module_label = serializers.CharField(source="get_last_open_module_display", read_only=True)
+    icon_url = serializers.SerializerMethodField()
+
+    def get_icon_url(self, obj):
+        if not obj.icon:
+            return ""
+        request = self.context.get("request")
+        url = obj.icon.url
+        return request.build_absolute_uri(url) if request else url
 
     class Meta:
         model = Novel
@@ -15,6 +23,9 @@ class NovelSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "summary",
+            "icon",
+            "icon_url",
+            "is_locked",
             "visibility",
             "last_open_module",
             "last_open_chapter_id",
@@ -27,7 +38,7 @@ class NovelSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["author", "is_deleted"]
+        read_only_fields = ["author", "is_deleted", "icon_url", "is_locked"]
 
 
 class ChapterSerializer(serializers.ModelSerializer):

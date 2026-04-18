@@ -12,6 +12,7 @@ class User(AbstractUser):
 
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=16, choices=Role.choices, default=Role.AUTHOR)
+    custom_level = models.PositiveSmallIntegerField(default=1)
 
     REQUIRED_FIELDS = ["email"]
 

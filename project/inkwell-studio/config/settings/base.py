@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     "django_filters",
     "apps.core",
     "apps.accounts",
+    "apps.adminpanel",
     "apps.novels",
     "apps.customization",
 ]

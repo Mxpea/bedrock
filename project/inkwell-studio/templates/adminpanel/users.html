@@ -1,0 +1,87 @@
+{% extends 'adminpanel/base.html' %}
+
+{% block title %}用户管理 - 管理员后台{% endblock %}
+{% block page_title %}用户管理{% endblock %}
+{% block page_subtitle %}账号、角色与高级权限等级统一管理{% endblock %}
+
+{% block content %}
+<section class="admin-card">
+    <form method="get" class="inline">
+        <input type="text" name="q" placeholder="用户名 / 邮箱 / ID" value="{{ keyword }}">
+        <select name="role">
+            <option value="">全部角色</option>
+            <option value="author" {% if role == 'author' %}selected{% endif %}>作者</option>
+            <option value="editor" {% if role == 'editor' %}selected{% endif %}>编辑</option>
+            <option value="admin" {% if role == 'admin' %}selected{% endif %}>管理员</option>
+        </select>
+        <select name="status">
+            <option value="">全部状态</option>
+            <option value="active" {% if status == 'active' %}selected{% endif %}>正常</option>
+            <option value="banned" {% if status == 'banned' %}selected{% endif %}>封禁</option>
+        </select>
+        <button class="primary" type="submit">筛选</button>
+    </form>
+</section>
+
+<section class="admin-card">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>用户</th>
+                <th>角色</th>
+                <th>高级权限</th>
+                <th>状态</th>
+                <th>注册时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for u in page_obj %}
+            <tr>
+                <td>#{{ u.id }}</td>
+                <td><a href="{% url 'adminpanel:user-detail' u.id %}">{{ u.username }}</a><div class="admin-muted">{{ u.email }}</div></td>
+                <td>
+                    <form method="post" class="inline">{% csrf_token %}
+                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                        <input type="hidden" name="action" value="set_role">
+                        <select name="role">
+                            <option value="author" {% if u.role == 'author' %}selected{% endif %}>作者</option>
+                            <option value="editor" {% if u.role == 'editor' %}selected{% endif %}>编辑</option>
+                            <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>管理员</option>
+                        </select>
+                        <button type="submit">更新</button>
+                    </form>
+                </td>
+                <td>
+                    <form method="post" class="inline">{% csrf_token %}
+                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                        <input type="hidden" name="action" value="set_level">
+                        <select name="custom_level">
+                            <option value="1" {% if u.custom_level == 1 %}selected{% endif %}>Lv.1</option>
+                            <option value="2" {% if u.custom_level == 2 %}selected{% endif %}>Lv.2</option>
+                            <option value="3" {% if u.custom_level == 3 %}selected{% endif %}>Lv.3</option>
+                        </select>
+                        <button type="submit">更新</button>
+                    </form>
+                </td>
+                <td>{% if u.is_active %}<span class="tag ok">正常</span>{% else %}<span class="tag danger">封禁</span>{% endif %}</td>
+                <td>{{ u.date_joined|date:'Y-m-d H:i' }}</td>
+                <td>
+                    <form method="post" class="inline">{% csrf_token %}
+                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                        {% if u.is_active %}
+                        <button type="submit" name="action" value="ban" class="danger" onclick="return confirm('确认封禁该用户？')">封禁</button>
+                        {% else %}
+                        <button type="submit" name="action" value="unban">解封</button>
+                        {% endif %}
+                    </form>
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="7" class="admin-muted">暂无用户数据</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

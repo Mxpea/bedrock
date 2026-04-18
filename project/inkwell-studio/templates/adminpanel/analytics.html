@@ -1,0 +1,73 @@
+{% extends 'adminpanel/base.html' %}
+
+{% block title %}数据看板 - 管理员后台{% endblock %}
+{% block page_title %}数据看板{% endblock %}
+{% block page_subtitle %}用户增长、内容生产与协作活跃趋势{% endblock %}
+
+{% block content %}
+<section class="admin-card">
+    <form method="get" class="inline">
+        <select name="preset">
+            <option value="today" {% if preset == 'today' %}selected{% endif %}>今日</option>
+            <option value="week" {% if preset == 'week' %}selected{% endif %}>本周</option>
+            <option value="month" {% if preset == 'month' %}selected{% endif %}>本月</option>
+            <option value="custom" {% if preset == 'custom' %}selected{% endif %}>自定义</option>
+        </select>
+        <label>起 <input type="date" name="start" value="{{ start }}"></label>
+        <label>止 <input type="date" name="end" value="{{ end }}"></label>
+        <button type="submit" class="primary">更新</button>
+    </form>
+</section>
+
+<section class="admin-grid">
+    <article class="stat-card"><div class="stat-label">新增注册</div><div class="stat-value">{{ new_users }}</div></article>
+    <article class="stat-card"><div class="stat-label">活跃作者</div><div class="stat-value">{{ active_authors }}</div></article>
+    <article class="stat-card"><div class="stat-label">新建工作区</div><div class="stat-value">{{ new_workspaces }}</div></article>
+    <article class="stat-card"><div class="stat-label">新增章节</div><div class="stat-value">{{ new_chapters }}</div></article>
+</section>
+
+<section class="admin-grid">
+    <article class="stat-card"><div class="stat-label">公开章节</div><div class="stat-value">{{ published_chapters }}</div></article>
+    <article class="stat-card"><div class="stat-label">吐槽总数</div><div class="stat-value">{{ roast_total }}</div></article>
+    <article class="stat-card"><div class="stat-label">举报总数</div><div class="stat-value">{{ report_total }}</div></article>
+    <article class="stat-card"><div class="stat-label">导出</div><div class="inline" style="margin-top:8px;"><button type="button" onclick="window.print()">导出 PNG/PDF</button></div></article>
+</section>
+
+<div class="admin-columns">
+    <section class="admin-card">
+        <h3>用户增长趋势（日）</h3>
+        <table>
+            <thead><tr><th>日期</th><th>新增用户</th></tr></thead>
+            <tbody>
+            {% for item in users_series %}
+                <tr><td>{{ item.day }}</td><td>{{ item.total }}</td></tr>
+            {% empty %}
+                <tr><td colspan="2" class="admin-muted">暂无数据</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="admin-card">
+        <h3>内容生产趋势（日）</h3>
+        <table>
+            <thead><tr><th>日期</th><th>工作区</th><th>章节</th></tr></thead>
+            <tbody>
+            {% for w in workspace_series %}
+                <tr>
+                    <td>{{ w.day }}</td>
+                    <td>{{ w.total }}</td>
+                    <td>
+                        {% for c in chapter_series %}
+                            {% if c.day == w.day %}{{ c.total }}{% endif %}
+                        {% endfor %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="3" class="admin-muted">暂无数据</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</div>
+{% endblock %}

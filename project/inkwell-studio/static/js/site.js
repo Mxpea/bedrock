@@ -158,6 +158,7 @@ function getWorkspaceContext() {
         return {
             id: contextNode.dataset.workspaceId,
             title: contextNode.dataset.workspaceTitle,
+            icon_url: contextNode.dataset.workspaceIconUrl || "",
             module: contextNode.dataset.workspaceModule,
             chapterId: contextNode.dataset.workspaceChapterId,
         };
@@ -204,9 +205,13 @@ async function setupNavigation() {
         return;
     }
 
+    const isAdmin = user.role === "admin" || user.is_staff || user.is_superuser;
+    const adminLink = isAdmin ? '<a href="/admin/">控制台</a>' : "";
+
     nav.innerHTML = `
         <a href="/dashboard/">工作台</a>
         <a href="/novels/">发现</a>
+        ${adminLink}
         <a href="/u/${escapeHtml(user.username)}/">个人</a>
         <a href="#" onclick="logout(event)">退出 (${escapeHtml(user.username)})</a>
     `;
@@ -237,11 +242,15 @@ async function setupWorkspaceSwitcher() {
 
         const payload = await response.json();
         const workspaces = (Array.isArray(payload) ? payload : payload.results || []).slice(0, 5);
+        const summaryIcon = workspaceIconHtml(workspace.title || "当前工作区", workspace.icon_url || "", "switcher");
         const items = workspaces.length
             ? workspaces.map((item) => `
                 <a class="workspace-switcher-item ${String(item.id) === String(workspace.id) ? "active" : ""}" href="/workspace/${item.id}/writing/">
-                    <strong>${escapeHtml(item.title)}</strong>
-                    <span>${escapeHtml(item.visibility_label || item.visibility || "")}</span>
+                    ${workspaceIconHtml(item.title, item.icon_url || "", "switcher")}
+                    <div class="workspace-switcher-item-text">
+                        <strong>${escapeHtml(item.title)}</strong>
+                        <span>${escapeHtml(item.visibility_label || item.visibility || "")}</span>
+                    </div>
                 </a>
             `).join("")
             : '<p class="workspace-switcher-empty">还没有工作区</p>';
@@ -249,7 +258,10 @@ async function setupWorkspaceSwitcher() {
         switcher.innerHTML = `
             <details class="workspace-switcher-menu">
                 <summary>
-                    <span>${escapeHtml(workspace.title || "当前工作区")}</span>
+                    <span class="workspace-switcher-summary-main">
+                        ${summaryIcon}
+                        <span>${escapeHtml(workspace.title || "当前工作区")}</span>
+                    </span>
                     <span class="workspace-switcher-arrow">▾</span>
                 </summary>
                 <div class="workspace-switcher-panel">
@@ -517,9 +529,12 @@ async function setupWorkspaceDashboard() {
     container.innerHTML = workspaces.map((workspace) => `
         <article class="card workspace-card">
             <div class="workspace-card-top">
-                <div>
+                <div class="workspace-card-heading">
+                    ${workspaceIconHtml(workspace.title, workspace.icon_url || "", "card")}
+                    <div>
                     <p class="eyebrow">Workspace</p>
                     <h2>${escapeHtml(workspace.title)}</h2>
+                    </div>
                 </div>
                 <span class="badge">${escapeHtml(workspace.visibility_label || workspace.visibility)}</span>
             </div>
@@ -558,9 +573,12 @@ async function setupWorkspaceDiscover() {
     container.innerHTML = workspaces.map((workspace) => `
         <article class="card discover-card">
             <div class="workspace-card-top">
-                <div>
+                <div class="workspace-card-heading">
+                    ${workspaceIconHtml(workspace.title, workspace.icon_url || "", "card")}
+                    <div>
                     <p class="eyebrow">公开工作区</p>
                     <h2>${escapeHtml(workspace.title)}</h2>
+                    </div>
                 </div>
                 <span class="badge">${escapeHtml(workspace.visibility_label || workspace.visibility)}</span>
             </div>
@@ -624,6 +642,18 @@ function formatDate(value) {
         hour: "2-digit",
         minute: "2-digit",
     }).format(date);
+}
+
+function workspaceIconHtml(title, iconUrl, size = "card") {
+    const safeTitle = escapeHtml(title || "#");
+    const initial = safeTitle.slice(0, 1).toUpperCase();
+    const cls = size === "switcher" ? "workspace-icon workspace-icon-sm" : "workspace-icon workspace-icon-md";
+
+    if (iconUrl) {
+        return `<span class="${cls}"><img src="${escapeHtml(iconUrl)}" alt="${safeTitle} 图标" loading="lazy"></span>`;
+    }
+
+    return `<span class="${cls} workspace-icon-fallback">${initial}</span>`;
 }
 
 window.logout = logout;

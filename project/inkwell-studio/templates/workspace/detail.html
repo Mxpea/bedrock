@@ -4,10 +4,17 @@
 {% block title %}{{ workspace.title }} - 工作区{% endblock %}
 
 {% block content %}
-<div data-workspace-context data-workspace-id="{{ workspace.id }}" data-workspace-title="{{ workspace.title }}" data-workspace-module="{{ module }}" data-workspace-chapter-id="{% if active_chapter %}{{ active_chapter.id }}{% endif %}"></div>
+<div data-workspace-context data-workspace-id="{{ workspace.id }}" data-workspace-title="{{ workspace.title }}" data-workspace-icon-url="{% if workspace.icon %}{{ workspace.icon.url }}{% endif %}" data-workspace-module="{{ module }}" data-workspace-chapter-id="{% if active_chapter %}{{ active_chapter.id }}{% endif %}"></div>
 <section id="workspace-shell" class="workspace-shell {% if module == 'writing' %}workspace-shell-writing{% endif %}">
     <aside id="workspace-sidebar" class="workspace-sidebar">
         <div class="workspace-sidebar-head">
+            <div id="workspace-sidebar-icon" class="workspace-sidebar-icon">
+                {% if workspace.icon %}
+                <img src="{{ workspace.icon.url }}" alt="工作区图标">
+                {% else %}
+                <span>{{ workspace.title|make_list|first|upper }}</span>
+                {% endif %}
+            </div>
             <h2 class="workspace-name">{{ workspace.title }}</h2>
             <button type="button" class="layout-toggle-btn compact" id="btn-toggle-workspace-nav" title="收起工作区导航">◀</button>
         </div>
@@ -67,14 +74,250 @@
         {% elif module == 'settings' %}
         <section class="workspace-panel">
             <h1>工作区设置</h1>
-            <p class="lead">可见性、封面、简介和预览链接将在这里统一管理。</p>
-            <div class="workspace-card">
-                <p><strong>工作区名称：</strong>{{ workspace.title }}</p>
-                <p><strong>简介：</strong>{{ workspace.summary|default:"暂无简介" }}</p>
-                <p><strong>可见性：</strong>{{ workspace.get_visibility_display }}</p>
+            <p class="lead">在这里管理工作区基础信息与访问范围，修改后即时生效。</p>
+
+            <div class="workspace-settings-grid">
+                <form id="workspace-settings-form" class="stack-form workspace-settings-form">
+                    <div class="workspace-icon-setting">
+                        <div class="workspace-icon-preview-wrap">
+                            {% if workspace.icon %}
+                            <img id="workspace-icon-preview" class="workspace-icon-preview" src="{{ workspace.icon.url }}" alt="工作区图标">
+                            {% else %}
+                            <div id="workspace-icon-fallback" class="workspace-icon-fallback">{{ workspace.title|make_list|first|upper }}</div>
+                            <img id="workspace-icon-preview" class="workspace-icon-preview" src="" alt="工作区图标" style="display:none;">
+                            {% endif %}
+                        </div>
+                        <div class="workspace-icon-actions">
+                            <label class="button secondary" for="workspace-settings-icon">上传图标</label>
+                            <input id="workspace-settings-icon" type="file" accept="image/*" hidden>
+                            <p class="text-muted">自动裁切为 256x256 方形图标，超出部分居中裁切。</p>
+                        </div>
+                    </div>
+
+                    <label>
+                        <span>工作区名称</span>
+                        <input id="workspace-settings-title" type="text" value="{{ workspace.title }}" maxlength="200" required>
+                    </label>
+
+                    <label>
+                        <span>简介</span>
+                        <textarea id="workspace-settings-summary" rows="5" placeholder="介绍你的创作方向、题材或更新计划...">{{ workspace.summary }}</textarea>
+                    </label>
+
+                    <label>
+                        <span>可见性</span>
+                        <select id="workspace-settings-visibility">
+                            <option value="private" {% if workspace.visibility == 'private' %}selected{% endif %}>私密（仅自己可见）</option>
+                            <option value="link" {% if workspace.visibility == 'link' %}selected{% endif %}>链接可见（知道链接可访问）</option>
+                            <option value="public" {% if workspace.visibility == 'public' %}selected{% endif %}>公开（在发现页展示）</option>
+                        </select>
+                    </label>
+
+                    <div class="form-actions">
+                        <button type="submit" class="button primary">保存设置</button>
+                        <span id="workspace-settings-message" class="form-message"></span>
+                    </div>
+                </form>
+
+                <aside class="workspace-settings-side">
+                    <div class="workspace-card workspace-settings-meta">
+                        <p><strong>工作区 ID：</strong>{{ workspace.id }}</p>
+                        <p><strong>当前可见性：</strong>{{ workspace.get_visibility_display }}</p>
+                        <p><strong>创建时间：</strong>{{ workspace.created_at|date:"Y-m-d H:i" }}</p>
+                        <p><strong>最后更新：</strong>{{ workspace.updated_at|date:"Y-m-d H:i" }}</p>
+                    </div>
+
+                    <div class="workspace-card workspace-settings-danger">
+                        <h3>危险操作</h3>
+                        <p class="text-muted">删除后该工作区会从列表中移除，且不可直接恢复。</p>
+                        <button id="workspace-delete-btn" type="button" class="button secondary workspace-danger-btn">删除工作区</button>
+                    </div>
+                </aside>
             </div>
         </section>
         {% endif %}
     </main>
 </section>
+
+{% if module == 'settings' %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('workspace-settings-form');
+    const titleInput = document.getElementById('workspace-settings-title');
+    const summaryInput = document.getElementById('workspace-settings-summary');
+    const visibilityInput = document.getElementById('workspace-settings-visibility');
+    const iconInput = document.getElementById('workspace-settings-icon');
+    const iconPreview = document.getElementById('workspace-icon-preview');
+    const iconFallback = document.getElementById('workspace-icon-fallback');
+    const message = document.getElementById('workspace-settings-message');
+    const deleteBtn = document.getElementById('workspace-delete-btn');
+    const workspaceNameNode = document.querySelector('.workspace-name');
+    const workspaceIconNode = document.getElementById('workspace-sidebar-icon');
+    const workspaceLabel = document.getElementById('editor-workspace-label');
+    const workspaceContextNode = document.querySelector('[data-workspace-context]');
+
+    if (!form || !titleInput || !summaryInput || !visibilityInput) {
+        return;
+    }
+
+    const workspaceId = '{{ workspace.id }}';
+
+    const setMessage = (text, isError = false) => {
+        if (!message) return;
+        message.textContent = text || '';
+        message.style.color = isError ? '#b42318' : '';
+    };
+
+    const applyIconPreview = (url) => {
+        if (!iconPreview) return;
+        if (url) {
+            iconPreview.src = url;
+            iconPreview.style.display = '';
+            if (iconFallback) iconFallback.style.display = 'none';
+            if (workspaceIconNode) {
+                workspaceIconNode.innerHTML = `<img src="${url}" alt="工作区图标">`;
+            }
+            if (workspaceContextNode) {
+                workspaceContextNode.dataset.workspaceIconUrl = url;
+            }
+            if (typeof setupWorkspaceSwitcher === 'function') {
+                setupWorkspaceSwitcher();
+            }
+            return;
+        }
+
+        iconPreview.src = '';
+        iconPreview.style.display = 'none';
+        if (iconFallback) iconFallback.style.display = '';
+    };
+
+    if (iconInput) {
+        iconInput.addEventListener('change', async (event) => {
+            const file = event.target.files && event.target.files[0];
+            if (!file) {
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('icon', file);
+
+            setMessage('图标上传中...');
+            try {
+                const request = {
+                    method: 'POST',
+                    body: formData,
+                };
+
+                const response = typeof fetchWithAuthRetry === 'function'
+                    ? await fetchWithAuthRetry(`/api/workspaces/${workspaceId}/upload_icon/`, request)
+                    : await fetch(`/api/workspaces/${workspaceId}/upload_icon/`, request);
+
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    setMessage(data.detail || '图标上传失败', true);
+                    return;
+                }
+
+                applyIconPreview(data.icon_url || '');
+                setMessage('图标已更新');
+            } catch (error) {
+                setMessage('网络错误，图标上传失败', true);
+            } finally {
+                iconInput.value = '';
+            }
+        });
+    }
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const title = titleInput.value.trim();
+        if (!title) {
+            setMessage('工作区名称不能为空', true);
+            return;
+        }
+
+        const payload = {
+            title,
+            summary: summaryInput.value.trim(),
+            visibility: visibilityInput.value,
+        };
+
+        setMessage('保存中...');
+
+        try {
+            const request = {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            };
+
+            const response = typeof fetchWithAuthRetry === 'function'
+                ? await fetchWithAuthRetry(`/api/workspaces/${workspaceId}/`, request)
+                : await fetch(`/api/workspaces/${workspaceId}/`, request);
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const detail = data.detail || '保存失败，请稍后重试';
+                setMessage(detail, true);
+                return;
+            }
+
+            if (workspaceNameNode) {
+                workspaceNameNode.textContent = data.title || payload.title;
+            }
+
+            if (iconFallback && !iconPreview?.src) {
+                iconFallback.textContent = (data.title || payload.title || '#').slice(0, 1).toUpperCase();
+            }
+
+            if (workspaceLabel) {
+                const workspaceIdText = data.id || workspaceId;
+                workspaceLabel.textContent = `${data.title || payload.title} #${workspaceIdText}`;
+            }
+
+            setMessage('已保存');
+        } catch (error) {
+            setMessage('网络错误，保存失败', true);
+        }
+    });
+
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', async () => {
+            const name = titleInput.value.trim() || '{{ workspace.title }}';
+            const ok = window.confirm(`确认删除工作区「${name}」吗？此操作不可恢复。`);
+            if (!ok) {
+                return;
+            }
+
+            setMessage('删除中...');
+            deleteBtn.disabled = true;
+
+            try {
+                const request = {
+                    method: 'DELETE',
+                };
+
+                const response = typeof fetchWithAuthRetry === 'function'
+                    ? await fetchWithAuthRetry(`/api/workspaces/${workspaceId}/`, request)
+                    : await fetch(`/api/workspaces/${workspaceId}/`, request);
+
+                if (!response.ok) {
+                    setMessage('删除失败，请稍后重试', true);
+                    deleteBtn.disabled = false;
+                    return;
+                }
+
+                window.location.href = '/dashboard/';
+            } catch (error) {
+                setMessage('网络错误，删除失败', true);
+                deleteBtn.disabled = false;
+            }
+        });
+    }
+});
+</script>
+{% endif %}
 {% endblock %}

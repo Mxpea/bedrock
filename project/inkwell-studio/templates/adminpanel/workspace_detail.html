@@ -1,0 +1,46 @@
+{% extends 'adminpanel/base.html' %}
+
+{% block title %}工作区详情 - 管理员后台{% endblock %}
+{% block page_title %}工作区详情{% endblock %}
+{% block page_subtitle %}全量内容只读查看，可进行强制管控操作{% endblock %}
+
+{% block content %}
+{% if privacy_banner %}
+<div class="admin-banner">你正在以管理员身份查看私密内容，请注意隐私保护。</div>
+{% endif %}
+
+<section class="admin-card">
+    <div class="inline" style="justify-content:space-between; width:100%;">
+        <div>
+            <h3 style="margin:0;">{{ workspace.title }}</h3>
+            <p class="admin-muted">作者：<a href="{% url 'adminpanel:user-detail' workspace.author.id %}">{{ workspace.author.username }}</a> · 可见性：{{ workspace.get_visibility_display }} · 章节：{{ chapters|length }}</p>
+        </div>
+        <div class="inline">
+            <form method="post" class="inline">{% csrf_token %}
+                <button type="submit" name="action" value="force_private" class="warn" onclick="return confirm('确认强制私密？')">强制私密</button>
+                <button type="submit" name="action" value="toggle_lock" onclick="return confirm('确认切换锁定状态？')">{% if workspace.is_locked %}解锁{% else %}锁定{% endif %}</button>
+                <button type="submit" name="action" value="clear_cache" onclick="return confirm('确认执行缓存清理？')">清除缓存</button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<section class="admin-card">
+    <h3>章节目次与正文预览</h3>
+    <table>
+        <thead><tr><th>序号</th><th>标题</th><th>状态</th><th>更新时间</th></tr></thead>
+        <tbody>
+        {% for chapter in chapters %}
+            <tr>
+                <td>{{ chapter.order }}</td>
+                <td>{{ chapter.title }}</td>
+                <td>{% if chapter.is_published %}<span class="tag ok">公开</span>{% else %}<span class="tag">草稿</span>{% endif %}</td>
+                <td>{{ chapter.updated_at|date:'Y-m-d H:i' }}</td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="4" class="admin-muted">暂无章节</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

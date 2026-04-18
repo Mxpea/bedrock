@@ -1,0 +1,59 @@
+{% load static %}
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}管理员后台{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/admin.css' %}?v={% now 'U' %}">
+</head>
+<body>
+<div class="admin-layout">
+    <aside class="admin-side">
+        <div class="admin-brand">Bedrock 控制台</div>
+        <nav class="admin-nav">
+            <div class="admin-nav-group">
+                <p class="admin-nav-title">主控</p>
+                <a class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'adminpanel:dashboard' %}">仪表盘</a>
+                <a class="{% if request.resolver_match.url_name == 'workspaces' or request.resolver_match.url_name == 'workspace-detail' %}active{% endif %}" href="{% url 'adminpanel:workspaces' %}">工作区管理</a>
+                <a class="{% if request.resolver_match.url_name == 'users' or request.resolver_match.url_name == 'user-detail' %}active{% endif %}" href="{% url 'adminpanel:users' %}">用户管理</a>
+            </div>
+            <div class="admin-nav-group">
+                <p class="admin-nav-title">审核与监管</p>
+                <a class="{% if request.resolver_match.url_name == 'reviews' %}active{% endif %}" href="{% url 'adminpanel:reviews' %}">审核队列</a>
+                <a class="{% if request.resolver_match.url_name == 'roasts' %}active{% endif %}" href="{% url 'adminpanel:roasts' %}">吐槽监管</a>
+            </div>
+            <div class="admin-nav-group">
+                <p class="admin-nav-title">平台设置</p>
+                <a class="{% if request.resolver_match.url_name == 'settings' %}active{% endif %}" href="{% url 'adminpanel:settings' %}">系统设置</a>
+                <a class="{% if request.resolver_match.url_name == 'analytics' %}active{% endif %}" href="{% url 'adminpanel:analytics' %}">数据看板</a>
+                <a class="{% if request.resolver_match.url_name == 'ops' %}active{% endif %}" href="{% url 'adminpanel:ops' %}">运维工具</a>
+            </div>
+            <div class="admin-nav-group">
+                <p class="admin-nav-title">返回</p>
+                <a href="/dashboard/">作者工作台</a>
+                <a href="/django-admin/">Django 原生后台</a>
+            </div>
+        </nav>
+    </aside>
+
+    <main class="admin-main">
+        <div class="admin-top">
+            <div>
+                <h1 class="admin-title">{% block page_title %}管理员后台{% endblock %}</h1>
+                <p class="admin-muted">{% block page_subtitle %}高效管控、安全隔离、数据透明、最小侵入{% endblock %}</p>
+            </div>
+            <div class="admin-muted">{{ request.user.username }} / {{ request.user.get_role_display }}</div>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="notice {% if message.tags == 'error' %}error{% elif message.tags == 'success' %}success{% else %}info{% endif %}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+</div>
+</body>
+</html>

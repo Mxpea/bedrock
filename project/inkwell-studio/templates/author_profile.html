@@ -53,9 +53,16 @@
             {% for workspace in workspaces %}
             <article class="card workspace-card">
                 <div class="workspace-card-top">
-                    <div>
-                        <p class="eyebrow">Workspace</p>
-                        <h2 style="margin: 0; font-size: 1.2rem;">{{ workspace.title }}</h2>
+                    <div class="workspace-card-heading">
+                        {% if workspace.icon %}
+                        <span class="workspace-icon workspace-icon-md"><img src="{{ workspace.icon.url }}" alt="{{ workspace.title }} 图标"></span>
+                        {% else %}
+                        <span class="workspace-icon workspace-icon-md workspace-icon-fallback">{{ workspace.title|make_list|first|upper }}</span>
+                        {% endif %}
+                        <div>
+                            <p class="eyebrow">Workspace</p>
+                            <h2 style="margin: 0; font-size: 1.2rem;">{{ workspace.title }}</h2>
+                        </div>
                     </div>
                     <span class="badge">{{ workspace.get_visibility_display }}</span>
                 </div>

@@ -8,3 +8,4 @@ celery==5.4.0
 redis==5.2.1
 bleach==6.2.0
 Markdown==3.7
+Pillow==12.2.0

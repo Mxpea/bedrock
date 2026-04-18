@@ -1,0 +1,84 @@
+{% extends 'adminpanel/base.html' %}
+
+{% block title %}吐槽监管 - 管理员后台{% endblock %}
+{% block page_title %}吐槽监管{% endblock %}
+{% block page_subtitle %}全站吐槽内容审查与上下文处理{% endblock %}
+
+{% block content %}
+<section class="admin-card">
+    <form method="get" class="inline">
+        <input type="text" name="q" placeholder="内容或工作区关键词" value="{{ keyword }}">
+        <select name="visibility">
+            <option value="">全部可见范围</option>
+            <option value="internal" {% if visibility == 'internal' %}selected{% endif %}>内部公开</option>
+            <option value="editor" {% if visibility == 'editor' %}selected{% endif %}>编辑组</option>
+            <option value="private" {% if visibility == 'private' %}selected{% endif %}>私密</option>
+        </select>
+        <select name="status">
+            <option value="">全部状态</option>
+            <option value="normal" {% if status == 'normal' %}selected{% endif %}>正常</option>
+            <option value="reported" {% if status == 'reported' %}selected{% endif %}>被举报</option>
+            <option value="hidden" {% if status == 'hidden' %}selected{% endif %}>已屏蔽</option>
+        </select>
+        <button class="primary" type="submit">筛选</button>
+    </form>
+</section>
+
+<div class="admin-columns">
+    <section class="admin-card">
+        <table>
+            <thead><tr><th>内容</th><th>工作区/章节</th><th>可见性</th><th>状态</th><th>发布时间</th><th>操作</th></tr></thead>
+            <tbody>
+            {% for item in page_obj %}
+                <tr>
+                    <td>
+                        <a href="?id={{ item.id }}{% if visibility %}&visibility={{ visibility }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if keyword %}&q={{ keyword }}{% endif %}">{{ item.content|truncatechars:80 }}</a>
+                        <div class="admin-muted">{{ item.author.username|default:'匿名' }}{% if item.mentioned_user %} @{{ item.mentioned_user.username }}{% endif %}</div>
+                    </td>
+                    <td>
+                        {{ item.workspace.title }}
+                        {% if item.chapter %}<div class="admin-muted">{{ item.chapter.title }}</div>{% endif %}
+                    </td>
+                    <td>{{ item.get_visibility_display }}</td>
+                    <td>{{ item.get_status_display }}</td>
+                    <td>{{ item.created_at|date:'Y-m-d H:i' }}</td>
+                    <td>
+                        <form method="post" class="inline">{% csrf_token %}
+                            <input type="hidden" name="roast_id" value="{{ item.id }}">
+                            <button type="submit" name="action" value="hide" class="warn">屏蔽</button>
+                            <button type="submit" name="action" value="restore">恢复</button>
+                            <button type="submit" name="action" value="delete" class="danger" onclick="return confirm('确认删除？')">删除</button>
+                        </form>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="admin-muted">暂无吐槽数据</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="admin-card">
+        <h3>详情抽屉</h3>
+        {% if selected_roast %}
+            <p><strong>工作区：</strong>{{ selected_roast.workspace.title }}</p>
+            <p><strong>章节：</strong>{% if selected_roast.chapter %}{{ selected_roast.chapter.title }}{% else %}-{% endif %}</p>
+            <p><strong>全文：</strong></p>
+            <p>{{ selected_roast.content|linebreaksbr }}</p>
+            <h4>回复列表</h4>
+            <ul>
+            {% for reply in selected_roast.replies.all %}
+                <li>{{ reply.author.username|default:'匿名' }}：{{ reply.content|truncatechars:120 }}</li>
+            {% empty %}
+                <li class="admin-muted">暂无回复</li>
+            {% endfor %}
+            </ul>
+            {% if selected_roast.chapter %}
+            <a class="btn" href="/reader/{{ selected_roast.chapter.id }}/" target="_blank">跳转章节阅读页</a>
+            {% endif %}
+        {% else %}
+            <p class="admin-muted">点击左侧吐槽内容可查看上下文详情。</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

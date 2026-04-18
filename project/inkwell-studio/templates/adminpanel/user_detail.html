@@ -1,0 +1,87 @@
+{% extends 'adminpanel/base.html' %}
+
+{% block title %}用户详情 - 管理员后台{% endblock %}
+{% block page_title %}用户详情{% endblock %}
+{% block page_subtitle %}账号安全、资产与行为日志总览{% endblock %}
+
+{% block content %}
+<section class="admin-card">
+    <div class="inline" style="justify-content:space-between;width:100%;">
+        <div>
+            <h3 style="margin:0;">{{ target_user.username }}</h3>
+            <p class="admin-muted">ID #{{ target_user.id }} · {{ target_user.email }} · 角色 {{ target_user.get_role_display }} · Lv.{{ target_user.custom_level }}</p>
+        </div>
+        <form method="post" class="inline">{% csrf_token %}
+            <button type="submit" name="action" value="reset_homepage" onclick="return confirm('确认重置该用户主页装修配置？')">重置主页装修</button>
+        </form>
+    </div>
+</section>
+
+<div class="admin-columns">
+    <section class="admin-card">
+        <h3>工作区列表</h3>
+        <table>
+            <thead><tr><th>工作区</th><th>可见性</th><th>更新时间</th></tr></thead>
+            <tbody>
+            {% for ws in workspaces %}
+                <tr>
+                    <td><a href="{% url 'adminpanel:workspace-detail' ws.id %}">{{ ws.title }}</a></td>
+                    <td>{{ ws.get_visibility_display }}</td>
+                    <td>{{ ws.updated_at|date:'Y-m-d H:i' }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="3" class="admin-muted">暂无工作区</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="admin-card">
+        <h3>主页装修快照</h3>
+        {% if homepage_config %}
+            <p><strong>模板：</strong>{{ homepage_config.get_template_choice_display }}</p>
+            <p><strong>自定义页面：</strong>{% if homepage_config.use_custom_page %}已启用{% else %}未启用{% endif %}</p>
+            <p><strong>沙箱策略：</strong>{{ homepage_config.sandbox_mode }}</p>
+        {% else %}
+            <p class="admin-muted">暂无主页配置</p>
+        {% endif %}
+    </section>
+</div>
+
+<section class="admin-card">
+    <h3>高级权限申请记录</h3>
+    <table>
+        <thead><tr><th>申请时间</th><th>目标</th><th>状态</th><th>审核人</th></tr></thead>
+        <tbody>
+        {% for req in css_requests %}
+            <tr>
+                <td>{{ req.created_at|date:'Y-m-d H:i' }}</td>
+                <td>{% if req.novel %}{{ req.novel.title }}{% else %}账号级{% endif %}</td>
+                <td>{{ req.get_status_display }}</td>
+                <td>{% if req.reviewed_by %}{{ req.reviewed_by.username }}{% else %}-{% endif %}</td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="4" class="admin-muted">暂无申请记录</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section class="admin-card">
+    <h3>账号安全日志</h3>
+    <table>
+        <thead><tr><th>时间</th><th>动作</th><th>目标</th></tr></thead>
+        <tbody>
+        {% for log in audit_logs %}
+            <tr>
+                <td>{{ log.created_at|date:'Y-m-d H:i' }}</td>
+                <td>{{ log.action }}</td>
+                <td>{{ log.target_type }}#{{ log.target_id }}</td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="3" class="admin-muted">暂无日志</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

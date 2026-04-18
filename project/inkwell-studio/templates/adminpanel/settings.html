@@ -1,0 +1,99 @@
+{% extends 'adminpanel/base.html' %}
+
+{% block title %}系统设置 - 管理员后台{% endblock %}
+{% block page_title %}系统设置{% endblock %}
+{% block page_subtitle %}注册策略、邀请码、安全策略统一配置{% endblock %}
+
+{% block content %}
+<div class="admin-columns">
+    <section class="admin-card">
+        <h3>注册策略与安全策略</h3>
+        <form method="post">{% csrf_token %}
+            <input type="hidden" name="action" value="save_platform_settings">
+            <p>
+                <label>注册模式
+                    <select name="registration_mode">
+                        <option value="open" {% if platform_setting.registration_mode == 'open' %}selected{% endif %}>开放注册</option>
+                        <option value="invite_only" {% if platform_setting.registration_mode == 'invite_only' %}selected{% endif %}>仅邀请码注册</option>
+                    </select>
+                </label>
+            </p>
+            <p>
+                <label>注册默认角色
+                    <select name="default_registration_role">
+                        <option value="author" {% if platform_setting.default_registration_role == 'author' %}selected{% endif %}>作者</option>
+                        <option value="editor" {% if platform_setting.default_registration_role == 'editor' %}selected{% endif %}>编辑</option>
+                    </select>
+                </label>
+            </p>
+            <p>
+                <label>高级自定义权限审核模式
+                    <select name="advanced_css_review_mode">
+                        <option value="manual" {% if platform_setting.advanced_css_review_mode == 'manual' %}selected{% endif %}>手动审核</option>
+                        <option value="auto" {% if platform_setting.advanced_css_review_mode == 'auto' %}selected{% endif %}>自动通过（高风险）</option>
+                    </select>
+                </label>
+            </p>
+            <p>
+                <label>沙箱策略预设
+                    <input type="text" name="sandbox_preset" value="{{ platform_setting.sandbox_preset }}">
+                </label>
+            </p>
+            <p>
+                <label><input type="checkbox" name="require_public_review" {% if platform_setting.require_public_review %}checked{% endif %}> 公开内容需审核</label>
+            </p>
+            <p>
+                <label>敏感词词库（每行一个）
+                    <textarea name="sensitive_words">{{ platform_setting.sensitive_words }}</textarea>
+                </label>
+            </p>
+            <p>
+                <label>IP 白名单（每行一个）
+                    <textarea name="ip_whitelist">{{ platform_setting.ip_whitelist }}</textarea>
+                </label>
+            </p>
+            <p>
+                <label>IP 黑名单（每行一个）
+                    <textarea name="ip_blacklist">{{ platform_setting.ip_blacklist }}</textarea>
+                </label>
+            </p>
+            <button type="submit" class="primary">保存设置</button>
+        </form>
+    </section>
+
+    <section class="admin-card">
+        <h3>邀请码管理</h3>
+        <form method="post" class="inline" style="margin-bottom: 12px;">{% csrf_token %}
+            <input type="hidden" name="action" value="generate_invites">
+            <input type="text" name="prefix" placeholder="前缀" value="INV" style="width: 80px;">
+            <input type="number" name="count" min="1" max="500" value="20" style="width: 90px;">
+            <button type="submit" class="primary">生成邀请码</button>
+        </form>
+
+        <table>
+            <thead><tr><th>邀请码</th><th>状态</th><th>使用者</th><th>生成时间</th><th>操作</th></tr></thead>
+            <tbody>
+            {% for code in invite_codes %}
+                <tr>
+                    <td>{{ code.code }}</td>
+                    <td>{% if code.is_active and not code.used_by %}<span class="tag ok">有效</span>{% elif code.used_by %}<span class="tag">已使用</span>{% else %}<span class="tag danger">已失效</span>{% endif %}</td>
+                    <td>{% if code.used_by %}{{ code.used_by.username }}{% else %}-{% endif %}</td>
+                    <td>{{ code.created_at|date:'Y-m-d H:i' }}</td>
+                    <td>
+                        {% if code.is_active and not code.used_by %}
+                        <form method="post" class="inline">{% csrf_token %}
+                            <input type="hidden" name="action" value="invalidate_invite">
+                            <input type="hidden" name="code_id" value="{{ code.id }}">
+                            <button type="submit" class="danger" onclick="return confirm('确认提前失效该邀请码？')">失效</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="admin-muted">暂无邀请码</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends 'adminpanel/base.html' %}
+
+{% block title %}运维工具 - 管理员后台{% endblock %}
+{% block page_title %}运维工具{% endblock %}
+{% block page_subtitle %}仅超级管理员可用的高风险系统操作{% endblock %}
+
+{% block content %}
+<section class="admin-card">
+    <div class="inline">
+        <form method="post" class="inline">{% csrf_token %}
+            <button type="submit" name="action" value="clear_cache" class="warn" onclick="return confirm('确认清空全站缓存？')">缓存清理</button>
+            <button type="submit" name="action" value="reindex" onclick="return confirm('确认触发重建索引？')">强制重新索引</button>
+        </form>
+        <span class="tag info">文档转换服务：{{ doc_service_status }}</span>
+        <span class="tag info">搜索服务：{{ search_service_status }}</span>
+    </div>
+</section>
+
+<section class="admin-card">
+    <h3>最近 500 条管理员操作日志</h3>
+    <table>
+        <thead><tr><th>时间</th><th>操作者</th><th>动作</th><th>目标</th><th>元数据</th></tr></thead>
+        <tbody>
+        {% for log in audit_logs %}
+            <tr>
+                <td>{{ log.created_at|date:'Y-m-d H:i:s' }}</td>
+                <td>{% if log.actor %}{{ log.actor.username }}{% else %}-{% endif %}</td>
+                <td>{{ log.action }}</td>
+                <td>{{ log.target_type }}#{{ log.target_id }}</td>
+                <td>{{ log.metadata }}</td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="5" class="admin-muted">暂无日志</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
