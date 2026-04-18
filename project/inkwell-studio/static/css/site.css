@@ -12,6 +12,7 @@
     --topbar-bg: rgba(255, 255, 255, 0.7);
     --topbar-blur: blur(16px);
     --topbar-border: rgba(255, 255, 255, 0.6);
+    --topbar-safe-offset: 108px;
 }
 
 body.dark-mode {
@@ -466,7 +467,7 @@ body.dark-mode .secondary {
 
 .workspace-sidebar {
     position: sticky;
-    top: 108px;
+    top: var(--topbar-safe-offset);
     align-self: start;
     display: grid;
     gap: 20px;
@@ -782,6 +783,10 @@ body.dark-mode .secondary {
 }
 
 @media (max-width: 960px) {
+    :root {
+        --topbar-safe-offset: 132px;
+    }
+
     .workspace-shell {
         grid-template-columns: 1fr;
     }

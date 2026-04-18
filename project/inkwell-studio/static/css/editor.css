@@ -411,7 +411,7 @@ body.dark-mode .tool-btn.syntax-custom { background: rgba(255,255,255,0.04); bor
 
 .editor-live-preview {
     position: sticky;
-    top: 10px;
+    top: calc(var(--topbar-safe-offset, 108px) + 8px);
     align-self: start;
     border: 1px solid var(--line);
     border-radius: 14px;
