@@ -5,7 +5,7 @@
 
 {% block content %}
 <div data-workspace-context data-workspace-id="{{ workspace.id }}" data-workspace-title="{{ workspace.title }}" data-workspace-icon-url="{% if workspace.icon %}{{ workspace.icon.url }}{% endif %}" data-workspace-module="{{ module }}" data-workspace-chapter-id="{% if active_chapter %}{{ active_chapter.id }}{% endif %}"></div>
-<section id="workspace-shell" class="workspace-shell {% if module == 'writing' %}workspace-shell-writing{% endif %}">
+<section id="workspace-shell" class="workspace-shell {% if module == 'writing' %}workspace-shell-writing{% endif %} {% if module == 'outline' %}workspace-shell-outline{% endif %}">
     <aside id="workspace-sidebar" class="workspace-sidebar">
         <div class="workspace-sidebar-head">
             <div id="workspace-sidebar-icon" class="workspace-sidebar-icon">
@@ -44,7 +44,7 @@
         </div>
     </aside>
 
-    <main class="workspace-content {% if module == 'writing' %}workspace-content-writing{% endif %}">
+    <main class="workspace-content {% if module == 'writing' %}workspace-content-writing{% endif %} {% if module == 'outline' %}workspace-content-outline{% endif %}">
         {% if module != 'writing' %}
         <div class="workspace-breadcrumb">工作区：{{ workspace.title }} / {{ module_label }}</div>
         {% endif %}
@@ -52,44 +52,28 @@
         {% if module == 'writing' %}
         {% include 'workspace/modules/writing.html' %}
         {% elif module == 'outline' %}
-        <section class="workspace-panel">
-            <div class="outline-head">
-                <div>
-                    <h1>故事线工作台</h1>
-                    <p class="lead">用节点与连线编织叙事结构。支持章节绑定、人物线标注、线段样式与自动保存。</p>
-                </div>
-                <div class="outline-head-actions">
-                    <button type="button" id="outline-view-canvas" class="button secondary active">画布视图</button>
-                    <button type="button" id="outline-view-tree" class="button secondary">树状视图</button>
-                    <button type="button" id="outline-auto-layout" class="button secondary">整理布局</button>
-                    <button type="button" id="outline-export-json" class="button secondary">导出 JSON</button>
-                    <button type="button" id="outline-save" class="button primary">保存大纲</button>
-                </div>
-            </div>
+        <section class="workspace-panel workspace-panel-outline">
+            <div class="outline-shell" id="outline-layout" data-view-mode="canvas">
+                <section class="outline-main" id="outline-canvas-wrap">
+                    <header class="outline-main-head">
+                        <div>
+                            <h1>故事线工作台</h1>
+                            <p class="lead">X 轴可切换为时间轴，Y 轴用于区分叙事线。节点支持时间锚点吸附与章节双向绑定。</p>
+                        </div>
+                        <button type="button" id="outline-sidepanel-toggle" class="button secondary">收起工具栏</button>
+                    </header>
 
-            <div class="outline-toolbar">
-                <div class="outline-toolbar-group">
-                    <button type="button" class="button secondary" data-outline-create="chapter">+ 章节节点</button>
-                    <button type="button" class="button secondary" data-outline-create="plot">+ 情节点</button>
-                    <button type="button" class="button secondary" data-outline-create="character">+ 人物节点</button>
-                    <button type="button" class="button secondary" data-outline-create="note">+ 注释节点</button>
-                </div>
-                <div class="outline-toolbar-group">
-                    <input id="outline-search" type="search" placeholder="搜索节点标题、标签...">
-                    <select id="outline-filter-type">
-                        <option value="">全部类型</option>
-                        <option value="chapter">章节节点</option>
-                        <option value="plot">情节点</option>
-                        <option value="character">人物节点</option>
-                        <option value="note">注释节点</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="outline-layout" id="outline-layout" data-view-mode="canvas">
-                <section class="outline-canvas-wrap" id="outline-canvas-wrap">
                     <div class="outline-canvas" id="outline-canvas" tabindex="0" aria-label="故事线画布">
                         <div class="outline-grid" id="outline-grid"></div>
+
+                        <div id="outline-timeline-layer" class="outline-timeline-layer" hidden>
+                            <div class="outline-timeline-ruler" id="outline-timeline-ruler"></div>
+                            <div class="outline-unanchored" id="outline-unanchored" hidden>
+                                <h4>未锚定节点</h4>
+                                <div id="outline-unanchored-list"></div>
+                            </div>
+                        </div>
+
                         <div class="outline-viewport" id="outline-viewport">
                             <svg id="outline-edge-layer" class="outline-edge-layer" xmlns="http://www.w3.org/2000/svg">
                                 <defs>
@@ -100,14 +84,64 @@
                             </svg>
                             <div id="outline-node-layer" class="outline-node-layer"></div>
                         </div>
+
                         <div id="outline-minimap" class="outline-minimap"></div>
-                        <div id="outline-canvas-hint" class="outline-canvas-hint">中键或空格+拖拽平移，滚轮缩放，Delete 删除，Ctrl+Z/Y 撤销重做</div>
+                        <div id="outline-canvas-hint" class="outline-canvas-hint">中键或空格+拖拽平移，滚轮缩放，Delete 删除，Ctrl+Z/Y 撤销重做，双击时间标尺新建锚点</div>
                     </div>
 
                     <div id="outline-tree-view" class="outline-tree-view" hidden></div>
                 </section>
 
                 <aside class="outline-sidepanel" id="outline-sidepanel">
+                    <section class="outline-card">
+                        <h3>视图与模式</h3>
+                        <div class="outline-inline-actions">
+                            <button type="button" id="outline-view-canvas" class="button secondary active">画布</button>
+                            <button type="button" id="outline-view-tree" class="button secondary">树状</button>
+                        </div>
+                        <div class="outline-modebar">
+                            <div class="outline-mode-switch">
+                                <button type="button" id="outline-mode-free" class="button secondary active">自由模式</button>
+                                <button type="button" id="outline-mode-timeline" class="button secondary">时间轴模式</button>
+                            </div>
+                            <div class="outline-timeline-controls">
+                                <label>
+                                    <span>主时间轴</span>
+                                    <select id="outline-timeline-select"></select>
+                                </label>
+                                <button type="button" id="outline-add-timeline" class="button secondary">+ 时间轴</button>
+                                <button type="button" id="outline-toggle-parallel" class="button secondary">平行视图</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="outline-card">
+                        <h3>快速操作</h3>
+                        <div class="outline-quick-grid">
+                            <button type="button" class="button secondary" data-outline-create="chapter">+ 章节节点</button>
+                            <button type="button" class="button secondary" data-outline-create="plot">+ 情节点</button>
+                            <button type="button" class="button secondary" data-outline-create="character">+ 人物节点</button>
+                            <button type="button" class="button secondary" data-outline-create="note">+ 注释节点</button>
+                            <button type="button" class="button secondary" id="outline-create-from-chapter">从章节创建</button>
+                            <button type="button" class="button secondary" id="outline-create-from-character">从人物创建</button>
+                        </div>
+                        <div class="outline-search-row">
+                            <input id="outline-search" type="search" placeholder="搜索节点标题、标签...">
+                            <select id="outline-filter-type">
+                                <option value="">全部类型</option>
+                                <option value="chapter">章节节点</option>
+                                <option value="plot">情节点</option>
+                                <option value="character">人物节点</option>
+                                <option value="note">注释节点</option>
+                            </select>
+                        </div>
+                        <div class="outline-inline-actions">
+                            <button type="button" id="outline-auto-layout" class="button secondary">整理布局</button>
+                            <button type="button" id="outline-export-json" class="button secondary">导出 JSON</button>
+                            <button type="button" id="outline-save" class="button primary">保存大纲</button>
+                        </div>
+                    </section>
+
                     <section class="outline-card">
                         <h3>选中项</h3>
                         <div id="outline-empty-selection" class="text-muted">未选中节点或连线</div>
@@ -128,6 +162,11 @@
                             <label><span>关联章节</span>
                                 <select id="outline-node-chapter">
                                     <option value="">未关联</option>
+                                </select>
+                            </label>
+                            <label><span>绑定时间锚点</span>
+                                <select id="outline-node-anchor">
+                                    <option value="">未锚定</option>
                                 </select>
                             </label>
                             <div class="outline-inline-actions">
