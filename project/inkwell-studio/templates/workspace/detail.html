@@ -137,6 +137,7 @@
                         </div>
                         <div class="outline-inline-actions">
                             <button type="button" id="outline-auto-layout" class="button secondary">整理布局</button>
+                            <button type="button" id="outline-align-time" class="button secondary">按时间对齐</button>
                             <button type="button" id="outline-export-json" class="button secondary">导出 JSON</button>
                             <button type="button" id="outline-save" class="button primary">保存大纲</button>
                         </div>
@@ -162,6 +163,11 @@
                             <label><span>关联章节</span>
                                 <select id="outline-node-chapter">
                                     <option value="">未关联</option>
+                                </select>
+                            </label>
+                            <label><span>绑定时间轴</span>
+                                <select id="outline-node-timeline">
+                                    <option value="">使用当前时间轴</option>
                                 </select>
                             </label>
                             <label><span>绑定时间锚点</span>

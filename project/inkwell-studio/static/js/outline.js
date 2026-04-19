@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const saveBtn = document.getElementById("outline-save");
     const autoLayoutBtn = document.getElementById("outline-auto-layout");
+    const alignTimeBtn = document.getElementById("outline-align-time");
     const exportBtn = document.getElementById("outline-export-json");
     const addLegendBtn = document.getElementById("outline-add-legend");
     const viewCanvasBtn = document.getElementById("outline-view-canvas");
@@ -53,6 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const nodeDescriptionInput = document.getElementById("outline-node-description");
     const nodeTagsInput = document.getElementById("outline-node-tags");
     const nodeChapterInput = document.getElementById("outline-node-chapter");
+    const nodeTimelineInput = document.getElementById("outline-node-timeline");
     const nodeAnchorInput = document.getElementById("outline-node-anchor");
     const nodeCharacterInput = document.getElementById("outline-node-character");
     const openChapterBtn = document.getElementById("outline-open-chapter");
@@ -321,23 +323,56 @@ document.addEventListener("DOMContentLoaded", () => {
         return [...timeline.anchors].sort((a, b) => a.order - b.order);
     }
 
-    function timelineAnchorPositions() {
-        const anchors = getSortedAnchors();
-        const width = canvasEl.clientWidth;
-        const left = 72;
-        const right = Math.max(left + 40, width - 72);
+    function getSortedAnchorsByTimelineId(timelineId) {
+        const timeline = state.timelines.find((item) => item.id === timelineId);
+        if (!timeline) return [];
+        return [...timeline.anchors].sort((a, b) => a.order - b.order);
+    }
+
+    function getTimelineTrackWorldBounds() {
+        const leftWorld = 72;
+        const rightWorld = Math.max(leftWorld + 40, canvasEl.clientWidth - 72);
+        return { leftWorld, rightWorld };
+    }
+
+    function anchorWorldPositionsByTimelineId(timelineId) {
+        const anchors = getSortedAnchorsByTimelineId(timelineId);
         if (!anchors.length) return [];
 
-        const orders = anchors.map((item) => item.order);
+        const { leftWorld, rightWorld } = getTimelineTrackWorldBounds();
+        const worldSpan = Math.max(1, rightWorld - leftWorld);
+
+        if (anchors.length === 1) {
+            const ratio = clamp((Number(anchors[0].order) || 0) / 100, 0, 1);
+            return [{ ...anchors[0], worldX: leftWorld + worldSpan * ratio }];
+        }
+
+        const orders = anchors.map((item) => Number(item.order) || 0);
         const minOrder = Math.min(...orders);
         const maxOrder = Math.max(...orders);
-        const span = maxOrder - minOrder || 1;
+        const orderSpan = maxOrder - minOrder || 1;
 
         return anchors.map((anchor, idx) => {
-            const ratio = span === 0 ? (idx / Math.max(anchors.length - 1, 1)) : (anchor.order - minOrder) / span;
-            const x = left + (right - left) * ratio;
-            return { ...anchor, x };
+            const order = Number(anchor.order) || 0;
+            const ratio = orderSpan === 0 ? (idx / Math.max(anchors.length - 1, 1)) : (order - minOrder) / orderSpan;
+            return { ...anchor, worldX: leftWorld + worldSpan * ratio };
         });
+    }
+
+    function timelineAnchorPositions() {
+        const worldAnchors = anchorWorldPositionsByTimelineId(state.active_timeline_id);
+        return worldAnchors.map((anchor) => ({
+            ...anchor,
+            x: worldToScreen(anchor.worldX, 0).x,
+        }));
+    }
+
+    function timelineAnchorPositionsByTimelineId(timelineId) {
+        const worldAnchors = anchorWorldPositionsByTimelineId(timelineId);
+        return worldAnchors.map((anchor) => ({
+            ...anchor,
+            x: worldToScreen(anchor.worldX, 0).x,
+        }));
     }
 
     function ensureTimelineNodeAlignment(node) {
@@ -348,7 +383,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!anchorId) return;
         const anchor = activeAnchorPositions.find((item) => item.id === anchorId);
         if (!anchor) return;
-        node.position.x = Math.round(anchor.x - 116);
+        node.position.x = Math.round(anchor.worldX - 116);
     }
 
     function nodeSubtitle(node) {
@@ -390,10 +425,12 @@ document.addEventListener("DOMContentLoaded", () => {
             canvasEl.style.setProperty("--outline-lane-height", `${laneHeight}px`);
         }
 
+        const anchorTailHeight = Math.max(160, canvasEl.clientHeight - 50);
         const anchorHtml = activeAnchorPositions.map((anchor) => `
             <div class="outline-anchor" data-anchor-id="${escapeHtml(anchor.id)}" style="left:${anchor.x}px;--anchor-color:${escapeHtml(anchor.color || '#ef4444')}">
                 <span class="outline-anchor-dot"></span>
                 <span class="outline-anchor-label">${escapeHtml(anchor.label)}</span>
+                <span class="outline-anchor-tail" style="height:${anchorTailHeight}px"></span>
             </div>
         `).join("");
 
@@ -478,7 +515,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderEdges() {
         const visible = new Set(filteredNodes().map((item) => item.id));
         const byId = new Map(state.nodes.map((node) => [node.id, node]));
-        edgeLayer.querySelectorAll(".outline-edge, .outline-edge-label, .outline-edge-preview").forEach((el) => el.remove());
+        edgeLayer.querySelectorAll(".outline-edge, .outline-edge-label, .outline-edge-preview, .outline-edge-breakpoint, .outline-edge-breakpoint-hit").forEach((el) => el.remove());
 
         state.edges.forEach((edge) => {
             const source = byId.get(edge.source);
@@ -503,6 +540,26 @@ document.addEventListener("DOMContentLoaded", () => {
             if (arrow === "forward" || arrow === "both") pathEl.setAttribute("marker-end", "url(#outline-arrow-end)");
             if (arrow === "both") pathEl.setAttribute("marker-start", "url(#outline-arrow-end)");
             edgeLayer.appendChild(pathEl);
+
+            const breakDotHit = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            breakDotHit.setAttribute("cx", String(path.midX));
+            breakDotHit.setAttribute("cy", String(path.midY));
+            breakDotHit.setAttribute("r", "14");
+            breakDotHit.setAttribute("class", "outline-edge-breakpoint-hit");
+            breakDotHit.dataset.edgeId = edge.id;
+            if (shouldDim) breakDotHit.classList.add("is-filtered-out");
+            if (selection.kind === "edge" && selection.id === edge.id) breakDotHit.classList.add("is-selected");
+            edgeLayer.appendChild(breakDotHit);
+
+            const breakDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            breakDot.setAttribute("cx", String(path.midX));
+            breakDot.setAttribute("cy", String(path.midY));
+            breakDot.setAttribute("r", "6");
+            breakDot.setAttribute("class", "outline-edge-breakpoint");
+            breakDot.dataset.edgeId = edge.id;
+            if (shouldDim) breakDot.classList.add("is-filtered-out");
+            if (selection.kind === "edge" && selection.id === edge.id) breakDot.classList.add("is-selected");
+            edgeLayer.appendChild(breakDot);
 
             if (edge.data.label) {
                 const textEl = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -643,6 +700,10 @@ document.addEventListener("DOMContentLoaded", () => {
             .concat(characters.map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`))
             .join("");
 
+        nodeTimelineInput.innerHTML = ['<option value="">使用当前时间轴</option>']
+            .concat(state.timelines.map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`))
+            .join("");
+
         nodeAnchorInput.innerHTML = ['<option value="">未锚定</option>']
             .concat(getSortedAnchors().map((item) => `<option value="${item.id}">${escapeHtml(item.label)}</option>`))
             .join("");
@@ -680,6 +741,7 @@ document.addEventListener("DOMContentLoaded", () => {
             nodeTagsInput.value = (selectedNode.data.tags || []).join(", ");
             nodeChapterInput.value = selectedNode.data.chapter_id ? String(selectedNode.data.chapter_id) : "";
             nodeCharacterInput.value = selectedNode.data.character_id ? String(selectedNode.data.character_id) : "";
+            nodeTimelineInput.value = selectedNode.data.timeline_id || "";
             nodeAnchorInput.value = selectedNode.data.anchor_id || "";
             openChapterBtn.disabled = !selectedNode.data.chapter_id;
         }
@@ -869,6 +931,16 @@ document.addEventListener("DOMContentLoaded", () => {
         setStatus(`已创建${nodeTypeLabel(type)}`);
     }
 
+    function openNodeContextMenu(nodeId, clientX, clientY) {
+        selectNodeById(nodeId);
+        openContextMenu([
+            { action: `node:bind-timeline:${nodeId}`, label: "绑定到时间轴..." },
+            { action: `node:create-anchor-bind:${nodeId}`, label: "新建时间点并绑定" },
+            { action: `delete:${nodeId}`, label: "删除节点" },
+            { action: `copy:${nodeId}`, label: "复制节点" },
+        ], clientX, clientY);
+    }
+
     function deleteSelection() {
         if (selection.kind === "node") {
             const id = selection.id;
@@ -937,6 +1009,8 @@ document.addEventListener("DOMContentLoaded", () => {
         state.viewport.x = panning.originX + dx;
         state.viewport.y = panning.originY + dy;
         applyViewport();
+        activeAnchorPositions = timelineAnchorPositions();
+        renderTimelineLayer();
         renderEdges();
         renderMinimap();
     }
@@ -959,7 +1033,7 @@ document.addEventListener("DOMContentLoaded", () => {
             nodeId,
             offsetX: world.x - node.position.x,
             offsetY: world.y - node.position.y,
-            lockX: state.mode === "timeline" && Boolean(node.data.anchor_id),
+            lockX: false,
         };
     }
 
@@ -967,22 +1041,23 @@ document.addEventListener("DOMContentLoaded", () => {
         if (state.mode !== "timeline") return;
         if (!activeAnchorPositions.length) return;
 
+        const timelineId = node.data.timeline_id || state.active_timeline_id;
+        if (timelineId !== state.active_timeline_id) return;
+
         const centerX = node.position.x + 116;
         const nearest = activeAnchorPositions
-            .map((anchor) => ({ anchor, distance: Math.abs(anchor.x - centerX) }))
+            .map((anchor) => ({ anchor, distance: Math.abs(anchor.worldX - centerX) }))
             .sort((a, b) => a.distance - b.distance)[0];
 
-        if (nearest && nearest.distance <= 48) {
+        if (nearest && nearest.distance <= 72) {
             node.data.timeline_id = state.active_timeline_id;
             node.data.anchor_id = nearest.anchor.id;
-            node.position.x = Math.round(nearest.anchor.x - 116);
+            node.position.x = Math.round(nearest.anchor.worldX - 116);
             return;
         }
 
-        if (centerX < 96) {
+        if (node.data.anchor_id && nearest && nearest.distance > 120) {
             node.data.anchor_id = null;
-            node.data.timeline_id = state.active_timeline_id;
-            node.position.x = 16;
         }
     }
 
@@ -1021,9 +1096,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const rect = canvasEl.getBoundingClientRect();
             const localX = clientX - rect.left;
-            const left = 72;
-            const right = Math.max(left + 40, canvasEl.clientWidth - 72);
-            const ratio = clamp((localX - left) / Math.max(right - left, 1), 0, 1);
+            const world = screenToWorld(localX, 0);
+            const { leftWorld, rightWorld } = getTimelineTrackWorldBounds();
+            const ratio = clamp((world.x - leftWorld) / Math.max(rightWorld - leftWorld, 1), 0, 1);
 
             const anchors = getSortedAnchors();
             const orders = anchors.map((item) => item.order);
@@ -1052,9 +1127,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const rect = canvasEl.getBoundingClientRect();
         const localX = clientX - rect.left;
-        const left = 72;
-        const right = Math.max(left + 40, canvasEl.clientWidth - 72);
-        const ratio = clamp((localX - left) / Math.max(right - left, 1), 0, 1);
+        const world = screenToWorld(localX, 0);
+        const { leftWorld, rightWorld } = getTimelineTrackWorldBounds();
+        const ratio = clamp((world.x - leftWorld) / Math.max(rightWorld - leftWorld, 1), 0, 1);
 
         const existingOrders = timeline.anchors.map((item) => item.order);
         const minOrder = existingOrders.length ? Math.min(...existingOrders) : 0;
@@ -1072,6 +1147,140 @@ document.addEventListener("DOMContentLoaded", () => {
                 color: timeline.color || "#ef4444",
             });
         }, { pruneDanglingEdges: false });
+    }
+
+    function setAnchorOrder(anchorId) {
+        const timeline = getActiveTimeline();
+        const anchor = timeline?.anchors.find((item) => item.id === anchorId);
+        if (!anchor) return;
+        const next = window.prompt("请输入锚点排序值（order）", String(anchor.order));
+        if (next === null) return;
+        const parsed = Number(next);
+        if (!Number.isFinite(parsed)) {
+            setStatus("排序值必须是数字", true);
+            return;
+        }
+        mutate(() => {
+            anchor.order = parsed;
+        }, { pruneDanglingEdges: false });
+    }
+
+    function alignNodesByTimelineOrder() {
+        if (state.mode !== "timeline") {
+            setStatus("请先切换到时间轴模式", true);
+            return;
+        }
+
+        const timelines = state.parallel_view
+            ? state.timelines
+            : state.timelines.filter((item) => item.id === state.active_timeline_id);
+
+        timelines.forEach((timeline, laneIndex) => {
+            const anchors = getSortedAnchorsByTimelineId(timeline.id);
+            const orderMap = new Map(anchors.map((item) => [item.id, item.order]));
+            const laneBaseY = state.parallel_view ? (112 + laneIndex * 210) : 118;
+            const nodes = state.nodes
+                .filter((node) => (node.data.timeline_id || state.active_timeline_id) === timeline.id)
+                .sort((a, b) => {
+                    const ao = a.data.anchor_id ? (orderMap.get(a.data.anchor_id) ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
+                    const bo = b.data.anchor_id ? (orderMap.get(b.data.anchor_id) ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
+                    if (ao !== bo) return ao - bo;
+                    return a.position.y - b.position.y;
+                });
+
+            nodes.forEach((node, idx) => {
+                const nextY = laneBaseY + idx * 46;
+                if (state.parallel_view) {
+                    const minY = 100 + laneIndex * 210;
+                    node.position.y = clamp(nextY, minY, minY + 170);
+                } else {
+                    node.position.y = nextY;
+                }
+                ensureTimelineNodeAlignment(node);
+            });
+        });
+    }
+
+    function pickTimelineId(defaultTimelineId = "") {
+        if (!state.timelines.length) return null;
+        if (state.timelines.length === 1) return state.timelines[0].id;
+        const lines = state.timelines.map((item, idx) => `${idx + 1}. ${item.name}`);
+        const defaultIdx = Math.max(1, state.timelines.findIndex((item) => item.id === defaultTimelineId) + 1 || 1);
+        const picked = window.prompt(`选择时间轴序号:\n${lines.join("\n")}`, String(defaultIdx));
+        if (!picked) return null;
+        const timeline = state.timelines[Number(picked) - 1];
+        return timeline ? timeline.id : null;
+    }
+
+    function estimateAnchorOrderFromWorldX(timelineId, worldCenterX) {
+        const anchors = getSortedAnchorsByTimelineId(timelineId);
+        const { leftWorld, rightWorld } = getTimelineTrackWorldBounds();
+        const ratio = clamp((worldCenterX - leftWorld) / Math.max(rightWorld - leftWorld, 1), 0, 1);
+        if (!anchors.length) return 0;
+        const orders = anchors.map((item) => item.order);
+        const minOrder = Math.min(...orders);
+        const maxOrder = Math.max(...orders);
+        const span = maxOrder - minOrder;
+        if (span <= 0) {
+            return Math.round(minOrder + (ratio - 0.5) * 120);
+        }
+        return Math.round(minOrder + ratio * span);
+    }
+
+    function bindNodeToTimeline(nodeId, timelineId) {
+        const timeline = state.timelines.find((item) => item.id === timelineId);
+        if (!timeline) return;
+        mutate(() => {
+            const node = state.nodes.find((item) => item.id === nodeId);
+            if (!node) return;
+            node.data.timeline_id = timelineId;
+            const anchorIds = new Set((timeline.anchors || []).map((item) => item.id));
+            if (node.data.anchor_id && !anchorIds.has(node.data.anchor_id)) {
+                node.data.anchor_id = null;
+            }
+            state.active_timeline_id = timelineId;
+            ensureTimelineNodeAlignment(node);
+        }, { pruneDanglingEdges: false });
+        setStatus(`节点已绑定到时间轴：${timeline.name}`);
+    }
+
+    function createAnchorAndBindNode(nodeId) {
+        const node = state.nodes.find((item) => item.id === nodeId);
+        if (!node) return;
+        const timelineId = pickTimelineId(node.data.timeline_id || state.active_timeline_id);
+        if (!timelineId) return;
+        const timeline = state.timelines.find((item) => item.id === timelineId);
+        if (!timeline) return;
+        const label = window.prompt("请输入时间点名称", `时间点 ${(timeline.anchors?.length || 0) + 1}`);
+        if (!label) return;
+
+        mutate(() => {
+            const currentNode = state.nodes.find((item) => item.id === nodeId);
+            if (!currentNode) return;
+
+            const order = estimateAnchorOrderFromWorldX(timelineId, currentNode.position.x + 116);
+            const anchor = {
+                id: genId("anchor"),
+                label: label.trim(),
+                order,
+                color: timeline.color || "#ef4444",
+            };
+            timeline.anchors.push(anchor);
+
+            currentNode.data.timeline_id = timelineId;
+            currentNode.data.anchor_id = anchor.id;
+            state.active_timeline_id = timelineId;
+
+            if (state.mode === "timeline") {
+                const targetPositions = timelineAnchorPositionsByTimelineId(timelineId);
+                const target = targetPositions.find((item) => item.id === anchor.id);
+                if (target) {
+                    currentNode.position.x = Math.round(target.worldX - 116);
+                }
+            }
+        }, { pruneDanglingEdges: false });
+
+        setStatus(`已创建时间点并绑定节点：${timeline.name}`);
     }
 
     function escapeHtml(value) {
@@ -1194,6 +1403,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const anchorEl = event.target.closest(".outline-anchor");
         if (!anchorEl) return;
         event.preventDefault();
+        event.stopPropagation();
         startAnchorDrag(anchorEl.dataset.anchorId);
     });
 
@@ -1203,6 +1413,7 @@ document.addEventListener("DOMContentLoaded", () => {
         event.preventDefault();
         const anchorId = anchorEl.dataset.anchorId;
         openContextMenu([
+            { action: `anchor:order:${anchorId}`, label: "设置时间值" },
             { action: `anchor:rename:${anchorId}`, label: "重命名锚点" },
             { action: `anchor:delete:${anchorId}`, label: "删除锚点" },
         ], event.clientX, event.clientY);
@@ -1216,6 +1427,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     canvasEl.addEventListener("mousedown", (event) => {
         closeContextMenu();
+
+        const inTimelineLayer = event.target.closest("#outline-timeline-layer");
+        if (inTimelineLayer) {
+            return;
+        }
 
         const isMiddle = event.button === 1;
         const canPanBySpace = event.button === 0 && spacePressed;
@@ -1251,6 +1467,13 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        const edgeBreakEl = event.target.closest(".outline-edge-breakpoint-hit, .outline-edge-breakpoint");
+        if (edgeBreakEl) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
+
         if (event.button === 0) {
             clearSelection();
             startPan(event.clientX, event.clientY);
@@ -1268,12 +1491,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const nodeEl = event.target.closest(".outline-node");
         if (nodeEl) {
-            const nodeId = nodeEl.dataset.nodeId;
-            selectNodeById(nodeId);
-            openContextMenu([
-                { action: `delete:${nodeId}`, label: "删除节点" },
-                { action: `copy:${nodeId}`, label: "复制节点" },
-            ], event.clientX, event.clientY);
+            openNodeContextMenu(nodeEl.dataset.nodeId, event.clientX, event.clientY);
             return;
         }
 
@@ -1285,6 +1503,14 @@ document.addEventListener("DOMContentLoaded", () => {
         ], event.clientX, event.clientY);
     });
 
+    document.addEventListener("contextmenu", (event) => {
+        const nodeEl = event.target.closest(".outline-node");
+        if (!nodeEl || !canvasEl.contains(nodeEl)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        openNodeContextMenu(nodeEl.dataset.nodeId, event.clientX, event.clientY);
+    }, true);
+
     contextMenu.addEventListener("click", (event) => {
         const btn = event.target.closest("[data-menu-action]");
         if (!btn) return;
@@ -1294,6 +1520,16 @@ document.addEventListener("DOMContentLoaded", () => {
             if (action.startsWith("create:")) {
                 const [, type, x, y] = action.split(":");
                 onCreateNode(type, Math.round(Number(x) || 0), Math.round(Number(y) || 0));
+            } else if (action.startsWith("node:bind-timeline:")) {
+                const [, , , nodeId] = action.split(":");
+                const node = state.nodes.find((item) => item.id === nodeId);
+                if (node) {
+                    const timelineId = pickTimelineId(node.data.timeline_id || state.active_timeline_id);
+                    if (timelineId) bindNodeToTimeline(nodeId, timelineId);
+                }
+            } else if (action.startsWith("node:create-anchor-bind:")) {
+                const [, , , nodeId] = action.split(":");
+                createAnchorAndBindNode(nodeId);
             } else if (action.startsWith("delete:")) {
                 const [, nodeId] = action.split(":");
                 selection = { kind: "node", id: nodeId };
@@ -1312,6 +1548,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         mutate(() => { anchor.label = next.trim(); }, { pruneDanglingEdges: false });
                     }
                 }
+            } else if (action.startsWith("anchor:order:")) {
+                const [, , , anchorId] = action.split(":");
+                setAnchorOrder(anchorId);
             } else if (action.startsWith("anchor:delete:")) {
                 const [, , , anchorId] = action.split(":");
                 mutate(() => {
@@ -1365,6 +1604,8 @@ document.addEventListener("DOMContentLoaded", () => {
         state.viewport.y += cursorY - after.y;
 
         applyViewport();
+        activeAnchorPositions = timelineAnchorPositions();
+        renderTimelineLayer();
         renderEdges();
         renderMinimap();
         scheduleAutosave();
@@ -1378,12 +1619,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.addEventListener("mouseup", (event) => {
         if (connecting) {
-            const targetHandle = event.target.closest(".outline-node-handle.in");
-            const targetNode = targetHandle?.closest(".outline-node");
+            const targetNode = event.target.closest(".outline-node");
             finishConnect(targetNode?.dataset.nodeId || null);
         }
         if (dragging || panning) stopDrag();
         if (panning) stopPan();
+    });
+
+    function disconnectEdgeById(edgeId) {
+        if (!edgeId) return;
+        mutate(() => {
+            state.edges = state.edges.filter((item) => item.id !== edgeId);
+            if (selection.kind === "edge" && selection.id === edgeId) {
+                selection = { kind: null, id: null };
+            }
+        }, { pruneDanglingEdges: false });
+        setStatus("已断开连线");
+    }
+
+    edgeLayer.addEventListener("pointerdown", (event) => {
+        const breakDot = event.target.closest(".outline-edge-breakpoint-hit, .outline-edge-breakpoint");
+        if (!breakDot) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.detail >= 2) {
+            disconnectEdgeById(breakDot.dataset.edgeId);
+        }
+    });
+
+    edgeLayer.addEventListener("dblclick", (event) => {
+        const breakDot = event.target.closest(".outline-edge-breakpoint-hit, .outline-edge-breakpoint");
+        if (!breakDot) return;
+        event.preventDefault();
+        event.stopPropagation();
+        disconnectEdgeById(breakDot.dataset.edgeId);
     });
 
     treeViewEl.addEventListener("click", (event) => {
@@ -1404,9 +1673,17 @@ document.addEventListener("DOMContentLoaded", () => {
             node.data.tags = nodeTagsInput.value.split(",").map((item) => item.trim()).filter(Boolean);
             node.data.chapter_id = nodeChapterInput.value ? Number(nodeChapterInput.value) : null;
             node.data.character_id = nodeCharacterInput.value ? Number(nodeCharacterInput.value) : null;
+            node.data.timeline_id = nodeTimelineInput.value || state.active_timeline_id;
             node.data.anchor_id = nodeAnchorInput.value || null;
+
+            if (node.data.anchor_id) {
+                const anchorIds = new Set(getSortedAnchorsByTimelineId(node.data.timeline_id).map((item) => item.id));
+                if (!anchorIds.has(node.data.anchor_id)) {
+                    node.data.anchor_id = null;
+                }
+            }
+
             if (state.mode === "timeline") {
-                node.data.timeline_id = state.active_timeline_id;
                 ensureTimelineNodeAlignment(node);
             }
 
@@ -1470,6 +1747,13 @@ document.addEventListener("DOMContentLoaded", () => {
             autoLayout();
         });
         setStatus("已整理节点布局");
+    });
+
+    alignTimeBtn?.addEventListener("click", () => {
+        mutate(() => {
+            alignNodesByTimelineOrder();
+        }, { pruneDanglingEdges: false });
+        setStatus("已按时间顺序对齐");
     });
 
     exportBtn.addEventListener("click", exportJson);

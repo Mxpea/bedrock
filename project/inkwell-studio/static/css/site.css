@@ -846,7 +846,9 @@ body.dark-mode .secondary {
 
 .outline-edge,
 .outline-edge-label,
-.outline-edge-preview {
+.outline-edge-preview,
+.outline-edge-breakpoint,
+.outline-edge-breakpoint-hit {
     pointer-events: auto;
 }
 
@@ -861,6 +863,33 @@ body.dark-mode .secondary {
 }
 
 .outline-edge.is-filtered-out {
+    opacity: 0.22;
+}
+
+.outline-edge-breakpoint {
+    fill: #ffffff;
+    stroke: #16324f;
+    stroke-width: 1.5;
+    pointer-events: none;
+}
+
+.outline-edge-breakpoint-hit {
+    fill: rgba(0, 0, 0, 0.01);
+    stroke: rgba(0, 0, 0, 0.01);
+    cursor: pointer;
+    pointer-events: all;
+}
+
+.outline-edge-breakpoint:hover {
+    fill: #e2e8f0;
+}
+
+.outline-edge-breakpoint.is-selected {
+    stroke: #1d4ed8;
+    stroke-width: 2;
+}
+
+.outline-edge-breakpoint.is-filtered-out {
     opacity: 0.22;
 }
 
@@ -1333,6 +1362,16 @@ body.dark-mode .secondary {
     background: #fff;
     color: #334155;
     white-space: nowrap;
+}
+
+.outline-anchor-tail {
+    position: absolute;
+    top: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 1px dashed color-mix(in srgb, var(--anchor-color, #ef4444) 72%, transparent);
+    opacity: 0.75;
+    pointer-events: none;
 }
 
 .outline-timeline-lane {
