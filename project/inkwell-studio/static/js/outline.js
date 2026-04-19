@@ -25,6 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const timelineRulerEl = document.getElementById("outline-timeline-ruler");
     const timelineSelectEl = document.getElementById("outline-timeline-select");
     const addTimelineBtn = document.getElementById("outline-add-timeline");
+    const addAnchorBtn = document.getElementById("outline-add-anchor");
     const parallelViewBtn = document.getElementById("outline-toggle-parallel");
     const modeFreeBtn = document.getElementById("outline-mode-free");
     const modeTimelineBtn = document.getElementById("outline-mode-timeline");
@@ -51,6 +52,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const nodeTitleInput = document.getElementById("outline-node-title");
     const nodeTypeInput = document.getElementById("outline-node-type");
     const nodeColorInput = document.getElementById("outline-node-color");
+    const nodeColorValueEl = document.getElementById("outline-node-color-value");
+    const nodeColorPresetsEl = document.getElementById("outline-node-color-presets");
     const nodeDescriptionInput = document.getElementById("outline-node-description");
     const nodeTagsInput = document.getElementById("outline-node-tags");
     const nodeChapterInput = document.getElementById("outline-node-chapter");
@@ -89,6 +92,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const history = [];
     const future = [];
+    const nodeColorPresets = [
+        "#16324f",
+        "#2563eb",
+        "#0ea5e9",
+        "#059669",
+        "#22c55e",
+        "#f59e0b",
+        "#f97316",
+        "#ef4444",
+        "#ec4899",
+        "#7c3aed",
+        "#8b5cf6",
+        "#64748b",
+    ];
 
     const state = normalizeCanvas(initialData);
     let selection = { kind: null, id: null };
@@ -481,13 +498,14 @@ document.addEventListener("DOMContentLoaded", () => {
             nodeEl.dataset.nodeId = node.id;
             nodeEl.style.left = `${node.position.x}px`;
             nodeEl.style.top = `${node.position.y}px`;
+            nodeEl.style.setProperty("--node-color", node.data.color_tag || "#16324f");
 
             const subtitle = nodeSubtitle(node);
             const subtitleHtml = subtitle ? `<p class="outline-node-subtitle">${escapeHtml(subtitle)}</p>` : "";
 
             nodeEl.innerHTML = `
                 <div class="outline-node-handle in" data-handle="in" title="输入"></div>
-                <header class="outline-node-head" style="--node-color:${escapeHtml(node.data.color_tag)}">
+                <header class="outline-node-head">
                     <span class="outline-node-type">${nodeTypeIcon(node.type)} ${nodeTypeLabel(node.type)}</span>
                 </header>
                 <h4 class="outline-node-title">${escapeHtml(node.title)}</h4>
@@ -736,7 +754,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (selectedNode) {
             nodeTitleInput.value = selectedNode.title || "";
             nodeTypeInput.value = selectedNode.type || "plot";
-            nodeColorInput.value = selectedNode.data.color_tag || "#16324f";
+            setNodeColor(selectedNode.data.color_tag || "#16324f", false);
             nodeDescriptionInput.value = selectedNode.data.description || "";
             nodeTagsInput.value = (selectedNode.data.tags || []).join(", ");
             nodeChapterInput.value = selectedNode.data.chapter_id ? String(selectedNode.data.chapter_id) : "";
@@ -768,6 +786,69 @@ document.addEventListener("DOMContentLoaded", () => {
         renderLegend();
         syncSelectionForms();
         layoutEl.classList.toggle("is-sidepanel-collapsed", sidepanelEl.hidden);
+    }
+
+    function setNodeColor(value, mutateNode = false) {
+        const nextColor = value || "#16324f";
+        nodeColorInput.value = nextColor;
+        if (nodeColorValueEl) nodeColorValueEl.textContent = nextColor.toUpperCase();
+        if (nodeColorPresetsEl) {
+            nodeColorPresetsEl.querySelectorAll("[data-node-color]").forEach((btn) => {
+                btn.classList.toggle("is-active", btn.dataset.nodeColor === nextColor.toLowerCase());
+            });
+        }
+        if (!mutateNode) return;
+        const node = selectedNode();
+        if (!node) return;
+        mutate(() => {
+            node.data.color_tag = nextColor;
+        }, { pruneDanglingEdges: false });
+    }
+
+    function applyNodeFormChanges() {
+        const node = selectedNode();
+        if (!node) return;
+        mutate(() => {
+            if (!node.data) node.data = {};
+            node.title = nodeTitleInput.value.trim() || nodeTypeLabel(node.type);
+            node.type = nodeTypeInput.value;
+            node.data.color_tag = nodeColorInput.value;
+            node.data.description = nodeDescriptionInput.value;
+            node.data.tags = nodeTagsInput.value.split(",").map((item) => item.trim()).filter(Boolean);
+            node.data.chapter_id = nodeChapterInput.value ? Number(nodeChapterInput.value) : null;
+            node.data.character_id = nodeCharacterInput.value ? Number(nodeCharacterInput.value) : null;
+            node.data.timeline_id = nodeTimelineInput.value || state.active_timeline_id;
+            node.data.anchor_id = nodeAnchorInput.value || null;
+
+            if (node.data.anchor_id) {
+                const anchorIds = new Set(getSortedAnchorsByTimelineId(node.data.timeline_id).map((item) => item.id));
+                if (!anchorIds.has(node.data.anchor_id)) {
+                    node.data.anchor_id = null;
+                }
+            }
+
+            if (state.mode === "timeline") {
+                ensureTimelineNodeAlignment(node);
+            }
+
+            if (node.type === "chapter") {
+                const chapter = chapters.find((item) => item.id === node.data.chapter_id);
+                if (chapter && (node.title === "章节节点" || !nodeTitleInput.value.trim())) node.title = chapter.title;
+            }
+        }, { pruneDanglingEdges: false });
+    }
+
+    function applyEdgeFormChanges() {
+        const edge = selectedEdge();
+        if (!edge) return;
+        mutate(() => {
+            if (!edge.data) edge.data = {};
+            edge.data.color = edgeColorInput.value;
+            edge.data.line_style = edgeStyleInput.value;
+            edge.data.width = Number(edgeWidthInput.value || 2);
+            edge.data.arrow = edgeArrowInput.value;
+            edge.data.label = edgeLabelInput.value.trim();
+        }, { pruneDanglingEdges: false });
     }
 
     async function fetchJson(url, init = {}) {
@@ -1375,6 +1456,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }, { pruneDanglingEdges: false });
     });
 
+    addAnchorBtn?.addEventListener("click", () => {
+        if (!state.active_timeline_id) return;
+        const rect = canvasEl.getBoundingClientRect();
+        const centerX = rect.left + canvasEl.clientWidth / 2;
+        createAnchorByClick(centerX);
+    });
+
     parallelViewBtn.addEventListener("click", () => {
         mutate(() => {
             state.parallel_view = !state.parallel_view;
@@ -1417,6 +1505,54 @@ document.addEventListener("DOMContentLoaded", () => {
             { action: `anchor:rename:${anchorId}`, label: "重命名锚点" },
             { action: `anchor:delete:${anchorId}`, label: "删除锚点" },
         ], event.clientX, event.clientY);
+    });
+
+    ["input", "change"].forEach((eventName) => {
+        nodeForm.addEventListener(eventName, () => {
+            const node = selectedNode();
+            if (!node) return;
+            mutate(() => {
+                if (!node.data) node.data = {};
+                node.title = nodeTitleInput.value.trim() || nodeTypeLabel(node.type);
+                node.type = nodeTypeInput.value;
+                node.data.color_tag = nodeColorInput.value;
+                node.data.description = nodeDescriptionInput.value;
+                node.data.tags = nodeTagsInput.value.split(",").map((item) => item.trim()).filter(Boolean);
+                node.data.chapter_id = nodeChapterInput.value ? Number(nodeChapterInput.value) : null;
+                node.data.character_id = nodeCharacterInput.value ? Number(nodeCharacterInput.value) : null;
+                node.data.timeline_id = nodeTimelineInput.value || state.active_timeline_id;
+                node.data.anchor_id = nodeAnchorInput.value || null;
+
+                if (node.data.anchor_id) {
+                    const anchorIds = new Set(getSortedAnchorsByTimelineId(node.data.timeline_id).map((item) => item.id));
+                    if (!anchorIds.has(node.data.anchor_id)) {
+                        node.data.anchor_id = null;
+                    }
+                }
+
+                if (state.mode === "timeline") {
+                    ensureTimelineNodeAlignment(node);
+                }
+
+                if (node.type === "chapter") {
+                    const chapter = chapters.find((item) => item.id === node.data.chapter_id);
+                    if (chapter && (node.title === "绔犺妭鑺傜偣" || !nodeTitleInput.value.trim())) node.title = chapter.title;
+                }
+            }, { pruneDanglingEdges: false });
+        });
+
+        edgeForm.addEventListener(eventName, () => {
+            const edge = selectedEdge();
+            if (!edge) return;
+            mutate(() => {
+                if (!edge.data) edge.data = {};
+                edge.data.color = edgeColorInput.value;
+                edge.data.line_style = edgeStyleInput.value;
+                edge.data.width = Number(edgeWidthInput.value || 2);
+                edge.data.arrow = edgeArrowInput.value;
+                edge.data.label = edgeLabelInput.value.trim();
+            }, { pruneDanglingEdges: false });
+        });
     });
 
     unanchoredListEl.addEventListener("click", (event) => {
@@ -1662,49 +1798,31 @@ document.addEventListener("DOMContentLoaded", () => {
         selectNodeById(btn.dataset.treeNodeId);
     });
 
-    nodeForm.addEventListener("input", () => {
-        const node = selectedNode();
-        if (!node) return;
-        mutate(() => {
-            node.title = nodeTitleInput.value.trim() || nodeTypeLabel(node.type);
-            node.type = nodeTypeInput.value;
-            node.data.color_tag = nodeColorInput.value;
-            node.data.description = nodeDescriptionInput.value;
-            node.data.tags = nodeTagsInput.value.split(",").map((item) => item.trim()).filter(Boolean);
-            node.data.chapter_id = nodeChapterInput.value ? Number(nodeChapterInput.value) : null;
-            node.data.character_id = nodeCharacterInput.value ? Number(nodeCharacterInput.value) : null;
-            node.data.timeline_id = nodeTimelineInput.value || state.active_timeline_id;
-            node.data.anchor_id = nodeAnchorInput.value || null;
-
-            if (node.data.anchor_id) {
-                const anchorIds = new Set(getSortedAnchorsByTimelineId(node.data.timeline_id).map((item) => item.id));
-                if (!anchorIds.has(node.data.anchor_id)) {
-                    node.data.anchor_id = null;
-                }
-            }
-
-            if (state.mode === "timeline") {
-                ensureTimelineNodeAlignment(node);
-            }
-
-            if (node.type === "chapter") {
-                const chapter = chapters.find((item) => item.id === node.data.chapter_id);
-                if (chapter && (node.title === "章节节点" || !nodeTitleInput.value.trim())) node.title = chapter.title;
-            }
-        }, { pruneDanglingEdges: false });
+    [nodeTitleInput, nodeTypeInput, nodeColorInput, nodeDescriptionInput, nodeTagsInput, nodeChapterInput, nodeTimelineInput, nodeAnchorInput, nodeCharacterInput].forEach((control) => {
+        control.addEventListener("input", () => {
+            if (control === nodeColorInput) setNodeColor(nodeColorInput.value);
+            applyNodeFormChanges();
+        });
+        control.addEventListener("change", () => {
+            if (control === nodeColorInput) setNodeColor(nodeColorInput.value);
+            applyNodeFormChanges();
+        });
     });
 
-    edgeForm.addEventListener("input", () => {
-        const edge = selectedEdge();
-        if (!edge) return;
-        mutate(() => {
-            edge.data.color = edgeColorInput.value;
-            edge.data.line_style = edgeStyleInput.value;
-            edge.data.width = Number(edgeWidthInput.value || 2);
-            edge.data.arrow = edgeArrowInput.value;
-            edge.data.label = edgeLabelInput.value.trim();
-        }, { pruneDanglingEdges: false });
+    [edgeColorInput, edgeStyleInput, edgeWidthInput, edgeArrowInput, edgeLabelInput].forEach((control) => {
+        control.addEventListener("input", applyEdgeFormChanges);
+        control.addEventListener("change", applyEdgeFormChanges);
     });
+
+    if (nodeColorPresetsEl) {
+        nodeColorPresetsEl.innerHTML = nodeColorPresets.map((color) => `<button type="button" class="outline-color-preset" data-node-color="${color}" style="background:${color}" aria-label="${color}"></button>`).join("");
+        nodeColorPresetsEl.addEventListener("click", (event) => {
+            const btn = event.target.closest("[data-node-color]");
+            if (!btn) return;
+            setNodeColor(btn.dataset.nodeColor, true);
+            applyNodeFormChanges();
+        });
+    }
 
     openChapterBtn.addEventListener("click", () => {
         const node = selectedNode();

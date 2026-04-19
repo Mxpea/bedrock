@@ -86,7 +86,7 @@
                         </div>
 
                         <div id="outline-minimap" class="outline-minimap"></div>
-                        <div id="outline-canvas-hint" class="outline-canvas-hint">中键或空格+拖拽平移，滚轮缩放，Delete 删除，Ctrl+Z/Y 撤销重做，双击时间标尺新建锚点</div>
+                        <div id="outline-canvas-hint" class="outline-canvas-hint">中键或空格+拖拽平移，滚轮缩放，Delete 删除，Ctrl+Z/Y 撤销重做，双击标尺或点击[+时间点]新建锚点</div>
                     </div>
 
                     <div id="outline-tree-view" class="outline-tree-view" hidden></div>
@@ -109,14 +109,17 @@
                                     <span>主时间轴</span>
                                     <select id="outline-timeline-select"></select>
                                 </label>
-                                <button type="button" id="outline-add-timeline" class="button secondary">+ 时间轴</button>
-                                <button type="button" id="outline-toggle-parallel" class="button secondary">平行视图</button>
+                                <div class="outline-inline-actions" style="margin-top: 8px;">
+                                    <button type="button" id="outline-add-timeline" class="button secondary" title="新建时间轴轨道">+ 新轴</button>
+                                    <button type="button" id="outline-add-anchor" class="button secondary" title="在视野中央新建时间点">+ 时间点</button>
+                                    <button type="button" id="outline-toggle-parallel" class="button secondary">平行视图</button>
+                                </div>
                             </div>
                         </div>
                     </section>
 
                     <section class="outline-card">
-                        <h3>快速操作</h3>
+                        <h3>节点管理</h3>
                         <div class="outline-quick-grid">
                             <button type="button" class="button secondary" data-outline-create="chapter">+ 章节节点</button>
                             <button type="button" class="button secondary" data-outline-create="plot">+ 情节点</button>
@@ -125,21 +128,25 @@
                             <button type="button" class="button secondary" id="outline-create-from-chapter">从章节创建</button>
                             <button type="button" class="button secondary" id="outline-create-from-character">从人物创建</button>
                         </div>
-                        <div class="outline-search-row">
+                        <div class="outline-search-row" style="margin-top: 12px;">
                             <input id="outline-search" type="search" placeholder="搜索节点标题、标签...">
                             <select id="outline-filter-type">
-                                <option value="">全部类型</option>
-                                <option value="chapter">章节节点</option>
-                                <option value="plot">情节点</option>
-                                <option value="character">人物节点</option>
-                                <option value="note">注释节点</option>
+                                <option value="">全部</option>
+                                <option value="chapter">章节</option>
+                                <option value="plot">情节</option>
+                                <option value="character">人物</option>
+                                <option value="note">注释</option>
                             </select>
                         </div>
+                    </section>
+
+                    <section class="outline-card">
+                        <h3>画布操作</h3>
                         <div class="outline-inline-actions">
                             <button type="button" id="outline-auto-layout" class="button secondary">整理布局</button>
                             <button type="button" id="outline-align-time" class="button secondary">按时间对齐</button>
                             <button type="button" id="outline-export-json" class="button secondary">导出 JSON</button>
-                            <button type="button" id="outline-save" class="button primary">保存大纲</button>
+                            <button type="button" id="outline-save" class="button primary">保存</button>
                         </div>
                     </section>
 
@@ -157,7 +164,15 @@
                                     <option value="note">注释节点</option>
                                 </select>
                             </label>
-                            <label><span>颜色标签</span><input id="outline-node-color" type="color" value="#16324f"></label>
+                            <label><span>颜色标签</span>
+                                <div class="outline-color-picker">
+                                    <div class="outline-color-presets" id="outline-node-color-presets"></div>
+                                    <div class="outline-color-custom">
+                                        <input id="outline-node-color" type="color" value="#16324f">
+                                        <span id="outline-node-color-value">#16324f</span>
+                                    </div>
+                                </div>
+                            </label>
                             <label><span>描述（Markdown）</span><textarea id="outline-node-description" rows="4"></textarea></label>
                             <label><span>标签（逗号分隔）</span><input id="outline-node-tags" type="text" placeholder="主线, 伏笔"></label>
                             <label><span>关联章节</span>
