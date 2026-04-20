@@ -4,90 +4,1159 @@
 {% block title %}作者主页 - Bedrock{% endblock %}
 
 {% block content %}
-<div class="author-profile">
-    <!-- 1. 顶部头图区 -->
-    <section class="profile-hero">
-        <div class="profile-cover"></div>
-        <div class="profile-hero-content wrapper">
-            <div class="profile-avatar">
-                <div class="avatar-placeholder">{{ profile_user.username|make_list|first|upper }}</div>
-            </div>
-            <div class="profile-info">
-                <h1>{{ profile_user.username }} <span class="badge author-badge">Author</span></h1>
-                <p class="profile-bio">{{ profile_user.profile.bio|default:"这个人很懒，什么都没留下。" }}</p>
-            </div>
-            <div class="profile-actions">
-                {% if is_owner %}
-                <button class="button secondary" onclick="alert('装修功能开发中...')"><i class="ph ph-paint-brush"></i> 装修主页</button>
-                <a href="/dashboard/" class="button secondary"><i class="ph ph-kanban"></i> 进入工作台</a>
-                <a href="#" class="button secondary" onclick="navigator.clipboard.writeText(window.location.href); alert('主页链接已复制')">复制主页链接</a>
+<div class="author-homepage" id="author-homepage-app" data-profile-username="{{ profile_user.username }}" data-decorate-mode="{% if decorate_mode %}1{% else %}0{% endif %}" data-is-owner="{% if is_owner %}1{% else %}0{% endif %}">
+    <section class="author-homepage-hero">
+        <div class="author-homepage-cover" {% if homepage_config.header_image %}style="background-image: url('{{ homepage_config.header_image.url }}?v={{ homepage_config.updated_at|date:'U' }}'); background-size: cover; background-position: center;"{% endif %}></div>
+        <div class="author-homepage-hero-content wrapper">
+            <div class="author-homepage-avatar" {% if homepage_config.avatar %}style="background-image: url('{{ homepage_config.avatar.url }}?v={{ homepage_config.updated_at|date:'U' }}'); background-size: cover; background-position: center; width: 96px; height: 96px; border-radius: 999px; border: 4px solid #fff; flex-shrink: 0;"{% endif %}>
+                {% if not homepage_config.avatar %}
+                <div class="author-homepage-avatar-fallback">{{ profile_user.username|make_list|first|upper }}</div>
                 {% endif %}
             </div>
+            <div class="author-homepage-meta">
+                <h1>{{ profile_user.username }}</h1>
+                <p>{{ homepage_config.author_bio|default:"这个人很懒，什么都没留下。" }}</p>
+            </div>
+            {% if is_owner %}
+            <div class="author-homepage-actions">
+                {% if decorate_mode %}
+                <a class="button secondary" href="/u/{{ profile_user.username }}/"><i class="ph ph-eye"></i> 返回预览</a>
+                {% else %}
+                <a class="button secondary" href="/u/{{ profile_user.username }}/?decorate=1"><i class="ph ph-paint-brush"></i> 装修主页</a>
+                {% endif %}
+                <a class="button secondary" href="/dashboard/"><i class="ph ph-kanban"></i> 进入工作台</a>
+            </div>
+            {% endif %}
         </div>
     </section>
 
-    <!-- 2. 数据展示条 -->
-    <section class="profile-stats card wrapper" style="margin-top: -30px; position: relative; z-index: 10; display: flex; gap: 2rem; padding: 1rem 2rem;">
-        <div class="stat-item" style="display: flex; flex-direction: column; align-items: center;">
-            <span class="stat-value" style="font-size: 1.5rem; font-weight: bold; color: var(--color-base-100);">{{ public_workspaces_count }}</span>
-            <span class="stat-label" style="font-size: 0.8rem; color: var(--color-base-60);">公开工作区</span>
-        </div>
-        <div class="stat-item" style="display: flex; flex-direction: column; align-items: center;">
-            <span class="stat-value" style="font-size: 1.5rem; font-weight: bold; color: var(--color-base-100);">{{ public_chapters_count }}</span>
-            <span class="stat-label" style="font-size: 0.8rem; color: var(--color-base-60);">公开章节数</span>
-        </div>
-        <div class="stat-item" style="display: flex; flex-direction: column; align-items: center;">
-            <span class="stat-value" style="font-size: 1.5rem; font-weight: bold; color: var(--color-base-100);">{{ days_joined }}</span>
-            <span class="stat-label" style="font-size: 0.8rem; color: var(--color-base-60);">加入天数</span>
-        </div>
+    <section class="author-homepage-stats wrapper">
+        <article class="card stat-card">
+            <span class="value">{{ public_workspaces_count }}</span>
+            <span class="label">公开工作区</span>
+        </article>
+        <article class="card stat-card">
+            <span class="value">{{ public_chapters_count }}</span>
+            <span class="label">公开章节数</span>
+        </article>
+        <article class="card stat-card">
+            <span class="value">{{ days_joined }}</span>
+            <span class="label">加入天数</span>
+        </article>
     </section>
 
-    <!-- 3. 自定义模块区域：作品陈列柜 -->
-    <section class="profile-module wrapper" style="margin-top: 2rem;">
-        <div class="module-header" style="margin-bottom: 1rem;">
-            <h2>📚 作品陈列柜</h2>
-            <p class="eyebrow" style="color: var(--color-base-50); font-size: 0.8rem;">Public Workspaces</p>
+    <section class="wrapper author-homepage-canvas" id="ah-canvas"></section>
+
+    {% if decorate_mode and is_owner %}
+    
+    <div class="floating-toolbar" id="ah-floating-toolbar">
+        <button type="button" class="button secondary" id="ah-add-module-btn"><i class="ph ph-plus"></i> 添加组件</button>
+        <div style="width:1px;height:24px;background:#e2e8f0;margin:0 8px;"></div>
+        <button type="button" class="button secondary" id="ah-toolbar-save-draft">保存草稿</button>
+        <button type="button" class="button primary" id="ah-toolbar-publish">应用发布</button>
+        <span id="ah-status-float" class="text-muted" style="font-size:0.85rem;margin-left:8px;margin-right:8px;display:inline-block;min-width:60px;"></span>
+        <div style="width:1px;height:24px;background:#e2e8f0;margin:0 8px;"></div>
+        <button type="button" class="button neutral btn-sm" id="ah-close-toolbar" title="收起工具栏" style="padding:6px 12px;border:none;background:transparent;margin-right:-10px;">收起 <i class="ph ph-caret-down"></i></button>
+    </div>
+    <button type="button" class="ah-fab-toggle" id="ah-fab-toggle" hidden><i class="ph ph-magic-wand"></i> 开启装修</button>
+    <aside class="ah-builder-drawer">
+        <div class="ah-builder-header">
+            <h3>装修主页</h3>
+              <button type="button" class="button neutral btn-sm" id="ah-close-drawer" style="padding:4px 12px;">关闭 <i class="ph ph-caret-right"></i></button>
+            <div class="ah-builder-actions" hidden>
+                <button type="button" class="button secondary btn-sm" id="ah-save-draft">保存</button>
+                <button type="button" class="button primary btn-sm" id="ah-publish">发布</button>
+            </div>
+        </div>
+        <div id="ah-status" class="text-muted ah-builder-status"></div>
+        
+
+        <div class="ah-builder-section">
+            <h4>页面设置</h4>
+            <div class="ah-module-library">
+                <div style="margin-bottom: 12px;">
+                    <label class="label-text" style="display:block;margin-bottom:4px;">自定义背景图/头图</label>
+                    <input type="file" id="ah-header-upload" accept="image/*" style="font-size:0.85rem;width:100%" />
+                    <button type="button" id="ah-btn-upload-header" class="button neutral btn-sm" style="margin-top:6px;width:100%"><i class="ph ph-upload-simple"></i> 上传头图</button>
+                </div>
+                <div>
+                    <label class="label-text" style="display:block;margin-bottom:4px;">自定义头像</label>
+                    <input type="file" id="ah-avatar-upload" accept="image/*" style="font-size:0.85rem;width:100%" />
+                    <button type="button" id="ah-btn-upload-avatar" class="button neutral btn-sm" style="margin-top:6px;width:100%"><i class="ph ph-upload-simple"></i> 上传头像</button>
+                </div>
+                <div style="margin-top: 12px;">
+                    <label class="label-text" style="display:block;margin-bottom:4px;">主页简介</label>
+                    <textarea id="ah-page-bio" rows="4" style="width:100%;resize:vertical;">{{ homepage_config.author_bio|default:"" }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="ah-builder-section">
+            <h4>添加组件</h4>
+            <div class="ah-module-library" id="ah-module-library">
+                <button type="button" class="ah-module-btn" data-add-module="works"><i class="ph ph-books"></i> 作品陈列柜</button>
+                <button type="button" class="ah-module-btn" data-add-module="bio"><i class="ph ph-user"></i> 作者简介</button>
+                <button type="button" class="ah-module-btn" data-add-module="timeline"><i class="ph ph-clock"></i> 创作时间轴</button>
+                <button type="button" class="ah-module-btn" disabled title="开发中"><i class="ph ph-database"></i> 精选数据库 (WIP)</button>
+                <button type="button" class="ah-module-btn" disabled title="开发中"><i class="ph ph-chat-circle"></i> 留言板 (WIP)</button>
+                <button type="button" class="ah-module-btn" disabled title="开发中"><i class="ph ph-link"></i> 友情链接 (WIP)</button>
+            </div>
+        </div>
+
+        <div class="ah-builder-section builder-settings">
+            <h4>模块设置 <span class="text-muted" style="font-weight: normal; font-size: 0.8rem; float: right">(也可拖拽排序)</span></h4>
+            <div id="ah-settings-empty" class="text-muted" style="font-size: 0.9rem; padding: 10px; background: var(--bg); border-radius: 8px;">请在左侧点击选中一个模块继续配置。</div>
+            <form id="ah-settings-form" hidden>
+                <label>
+                    <span class="label-text">模块标题</span>
+                    <input type="text" id="ah-field-title">
+                </label>
+
+                <label id="ah-field-style-wrap" hidden>
+                    <span class="label-text">展示样式</span>
+                    <select id="ah-field-style">
+                        <option value="grid">网格卡片</option>
+                        <option value="list">极简列表</option>
+                    </select>
+                </label>
+
+                <label id="ah-field-sort-wrap" hidden>
+                    <span class="label-text">排序方式</span>
+                    <select id="ah-field-sort">
+                        <option value="updated">最近更新</option>
+                        <option value="name">名称排序</option>
+                    </select>
+                </label>
+
+                <label id="ah-field-limit-wrap" hidden>
+                    <span class="label-text">显示数量</span>
+                    <input type="number" min="1" max="24" id="ah-field-limit">
+                </label>
+
+                <label id="ah-field-bio-wrap" hidden>
+                    <span class="label-text">简介内容</span>
+                    <textarea id="ah-field-bio" rows="6"></textarea>
+                </label>
+
+                <label id="ah-field-show-chapter-wrap" class="checkbox-row" hidden>
+                    <input type="checkbox" id="ah-field-show-chapter"> <span>显示章节名</span>
+                </label>
+
+                <div class="ah-settings-footer" style="margin-top: 16px;">
+                    <button type="button" class="button danger btn-sm" id="ah-remove-module" style="width: 100%;"><i class="ph ph-trash"></i> 删除选中模块</button>
+                    <!-- Hidden buttons since we use drag and drop now, we can remove moveUp and moveDown or keep them hidden for accessible navigation -->
+                    <button type="button" id="ah-move-up" hidden>up</button>
+                    <button type="button" id="ah-move-down" hidden>down</button>
+                </div>
+            </form>
         </div>
         
-        <div class="feature-grid profile-workspace-grid">
-            {% for workspace in workspaces %}
-            <article class="card workspace-card">
-                <div class="workspace-card-top">
-                    <div class="workspace-card-heading">
-                        {% if workspace.icon %}
-                        <span class="workspace-icon workspace-icon-md"><img src="{{ workspace.icon.url }}" alt="{{ workspace.title }} 图标"></span>
-                        {% else %}
-                        <span class="workspace-icon workspace-icon-md workspace-icon-fallback">{{ workspace.title|make_list|first|upper }}</span>
-                        {% endif %}
-                        <div>
-                            <p class="eyebrow">Workspace</p>
-                            <h2 style="margin: 0; font-size: 1.2rem;">{{ workspace.title }}</h2>
-                        </div>
-                    </div>
-                    <span class="badge">{{ workspace.get_visibility_display }}</span>
-                </div>
-                <p class="workspace-card-summary" style="margin: 1rem 0; color: var(--color-base-70);">{{ workspace.summary|default:"暂无简介"|truncatechars:100 }}</p>
-                <div class="workspace-card-meta" style="font-size: 0.8rem; color: var(--color-base-50); margin-bottom: 1rem;">
-                    <span>更新于 {{ workspace.updated_at|date:"Y-m-d H:i" }}</span>
-                </div>
-                <div class="actions">
-                    {% if workspace.visibility == 'public' or is_owner %}
-                    <a href="/reader/?workspace_id={{ workspace.id }}" class="button primary">阅读</a>
-                    {% endif %}
-                    {% if is_owner %}
-                    <a href="/workspace/{{ workspace.id }}/writing/" class="button secondary">进入工作区</a>
-                    {% endif %}
-                </div>
-            </article>
-            {% empty %}
-            <article class="card workspace-empty-card" style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
-                <div class="empty-state">
-                    <h3 style="color: var(--color-base-60);">暂无公开工作区</h3>
-                    <p style="color: var(--color-base-50);">{% if is_owner %}调整工作区设置为“公开”后将展示在此。{% else %}该作者正在酝酿大作。{% endif %}</p>
-                </div>
-            </article>
-            {% endfor %}
+        <div class="ah-builder-section">
+            <h4>全局样式设置 <span class="badge">WIP</span></h4>
+            <p class="text-muted" style="font-size:0.8rem; margin:0;">主题色、背景图、字体方案等将在后续实现。</p>
         </div>
-    </section>
+
+    </aside>
+    {% endif %}
 </div>
+
+{{ homepage_modules_payload|json_script:"ah-workspaces" }}
+{{ homepage_timeline_payload|json_script:"ah-timeline" }}
+{{ homepage_schema|json_script:"ah-schema" }}
+{{ homepage_schema_draft|json_script:"ah-schema-draft" }}
+
+<style>
+.author-homepage {
+    display: grid;
+    gap: 18px;
+}
+
+.author-homepage-hero {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+}
+
+.author-homepage-cover {
+    height: 220px;
+    background: linear-gradient(120deg, #dbeafe 0%, #fef3c7 45%, #dcfce7 100%);
+}
+
+.author-homepage-hero-content {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 16px;
+    align-items: end;
+    margin-top: -54px;
+    padding-bottom: 16px;
+}
+
+.author-homepage-avatar-fallback {
+    width: 96px;
+    height: 96px;
+    border-radius: 999px;
+    border: 4px solid #fff;
+    background: #0f766e;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.author-homepage-meta h1 {
+    margin: 0;
+}
+
+.author-homepage-meta p {
+    margin: 8px 0 0;
+    color: var(--muted);
+}
+
+.author-homepage-actions {
+    display: flex;
+    gap: 8px;
+    align-self: center;
+}
+
+.author-homepage-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.stat-card {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    padding: 14px;
+}
+
+.stat-card .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.stat-card .label {
+    font-size: 0.84rem;
+    color: var(--muted);
+}
+
+.author-homepage-builder {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: 12px;
+}
+
+.builder-sidebar,
+.builder-settings {
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+}
+
+.builder-sidebar h3,
+.builder-settings h3 {
+    margin: 0;
+}
+
+.builder-actions {
+    display: grid;
+    gap: 6px;
+}
+
+.builder-publish-actions {
+    display: grid;
+    gap: 6px;
+}
+
+.builder-settings label {
+    display: grid;
+    gap: 6px;
+}
+
+.builder-settings input,
+.builder-settings select,
+.builder-settings textarea {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    padding: 8px 10px;
+}
+
+.author-homepage-canvas {
+    display: grid;
+    gap: 12px;
+}
+
+.homepage-module {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #fff;
+    padding: 14px;
+    display: grid;
+    gap: 10px;
+}
+
+.homepage-module.is-selected {
+    outline: 2px solid color-mix(in srgb, var(--accent) 25%, #fff);
+}
+
+.homepage-module-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.homepage-module-head h3 {
+    margin: 0;
+}
+
+.homepage-work-item p,
+.homepage-bio p,
+.homepage-timeline li {
+    margin: 0;
+    color: var(--muted);
+}
+
+.homepage-timeline {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding-left: 18px;
+}
+
+@media (max-width: 980px) {
+    .author-homepage-hero-content {
+        grid-template-columns: 1fr;
+        justify-items: start;
+        margin-top: -40px;
+    }
+
+    .author-homepage-stats,
+    .author-homepage-builder,
+    .homepage-work-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .author-homepage-actions {
+        flex-wrap: wrap;
+    }
+}
+
+.homepage-work-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+}
+
+.homepage-work-card {
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 24px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.02);
+}
+
+.homepage-work-card .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.homepage-work-card .card-title-group {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+}
+
+.homepage-work-card .card-cover {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 1px solid var(--line);
+    background: #f8fafc;
+}
+
+.homepage-work-card .card-title-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.homepage-work-card .card-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+}
+
+.homepage-work-card h4 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.homepage-work-card h4 a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.homepage-work-card .card-badge {
+    font-size: 1rem;
+    color: var(--text-main);
+    font-weight: 500;
+}
+
+.homepage-work-card .card-summary {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--text-main);
+    line-height: 1.5;
+    flex-grow: 1;
+}
+
+.homepage-work-card .card-time {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-light, #52525b);
+}
+
+.homepage-work-card .card-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.homepage-work-card .card-btn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 24px;
+    border-radius: 999px;
+    font-size: 1rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.homepage-work-card .card-btn.primary {
+    background: #183153;
+    color: #fff;
+    border: 1px solid #183153;
+}
+
+.homepage-work-card .card-btn.primary:hover {
+    background: #102441;
+}
+
+.homepage-work-card .card-btn.secondary {
+    background: #fff;
+    color: var(--text-main);
+    border: 1px solid #e2e8f0;
+}
+
+.homepage-work-card .card-btn.secondary:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+
+.ah-builder-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 340px;
+    height: 100vh;
+    background: #fff;
+    box-shadow: -4px 0 24px rgba(0,0,0,0.08);
+    z-index: 1000;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    border-left: 1px solid var(--line);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+}
+
+.ah-builder-drawer.is-open {
+    transform: translateX(0);
+}
+
+.ah-builder-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 12px;
+}
+
+.ah-builder-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.ah-builder-section h4 {
+    margin: 0 0 12px 0;
+    font-size: 0.95rem;
+    color: var(--text-main);
+}
+
+.ah-module-library {
+    display: grid;
+    gap: 8px;
+}
+
+.ah-module-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-main);
+    transition: all 0.2s;
+}
+
+.ah-module-btn:hover:not([disabled]) {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+
+.ah-module-btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.floating-toolbar {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    padding: 12px 24px;
+    border-radius: 999px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    z-index: 999;
+    border: 1px solid var(--line);
+}
+\n
+.ah-fab-toggle {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    background: #183153;
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 12px 24px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    cursor: pointer;
+    z-index: 999;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+.ah-fab-toggle:hover {
+    background: #102441;
+    transform: translateY(-2px);
+}
+
+</style>
+
+<script>
+(function () {
+    const app = document.getElementById('author-homepage-app');
+    if (!app) return;
+
+    const isOwner = app.dataset.isOwner === '1';
+    const decorateMode = app.dataset.decorateMode === '1';
+    const isEditing = isOwner && decorateMode;
+
+    function parseNode(id, fallback) {
+        const node = document.getElementById(id);
+        if (!node) return fallback;
+        try {
+            return JSON.parse(node.textContent || 'null') ?? fallback;
+        } catch (_) {
+            return fallback;
+        }
+    }
+
+    function getCookie(name) {
+        const cookies = document.cookie ? document.cookie.split(';') : [];
+        for (const raw of cookies) {
+            const cookie = raw.trim();
+            if (cookie.startsWith(name + '=')) {
+                return decodeURIComponent(cookie.slice(name.length + 1));
+            }
+        }
+        return '';
+    }
+
+    const csrftoken = getCookie('csrftoken');
+    const canvas = document.getElementById('ah-canvas');
+    const workspaces = parseNode('ah-workspaces', []);
+    const timeline = parseNode('ah-timeline', []);
+    const publishedSchema = parseNode('ah-schema', { modules: [] });
+    const draftSchema = parseNode('ah-schema-draft', publishedSchema);
+
+    const state = {
+        schema: JSON.parse(JSON.stringify(isEditing ? draftSchema : publishedSchema)),
+        selectedId: null,
+    };
+
+    const el = {
+        moduleLibrary: document.getElementById('ah-module-library'),
+        saveDraft: document.getElementById('ah-save-draft'),
+        publish: document.getElementById('ah-publish'),
+        addModuleBtn: document.getElementById('ah-add-module-btn'),
+        toolbarSaveBtn: document.getElementById('ah-toolbar-save-draft'),
+        toolbarPublishBtn: document.getElementById('ah-toolbar-publish'),
+        closeDrawerBtn: document.getElementById('ah-close-drawer'),
+        drawer: document.querySelector('.ah-builder-drawer'),
+        status: document.getElementById('ah-status'),
+        settingsEmpty: document.getElementById('ah-settings-empty'),
+        settingsForm: document.getElementById('ah-settings-form'),
+        fieldTitle: document.getElementById('ah-field-title'),
+        fieldStyleWrap: document.getElementById('ah-field-style-wrap'),
+        fieldStyle: document.getElementById('ah-field-style'),
+        fieldSortWrap: document.getElementById('ah-field-sort-wrap'),
+        fieldSort: document.getElementById('ah-field-sort'),
+        fieldLimitWrap: document.getElementById('ah-field-limit-wrap'),
+        fieldLimit: document.getElementById('ah-field-limit'),
+        fieldBioWrap: document.getElementById('ah-field-bio-wrap'),
+        fieldBio: document.getElementById('ah-field-bio'),
+        fieldShowChapterWrap: document.getElementById('ah-field-show-chapter-wrap'),
+        fieldShowChapter: document.getElementById('ah-field-show-chapter'),
+        moveUp: document.getElementById('ah-move-up'),
+        moveDown: document.getElementById('ah-move-down'),
+        
+        headerInput: document.getElementById('ah-header-upload'),
+        btnHeader: document.getElementById('ah-btn-upload-header'),
+        avatarInput: document.getElementById('ah-avatar-upload'),
+        btnAvatar: document.getElementById('ah-btn-upload-avatar'),
+        pageBio: document.getElementById('ah-page-bio'),
+        removeModule: document.getElementById('ah-remove-module'),
+    };
+
+    function setStatus(text, isError) {
+        if (!el.status) return;
+        el.status.textContent = text || '';
+        el.status.style.color = isError ? '#b42318' : '';
+    }
+
+    function selectedModule() {
+        return (state.schema.modules || []).find((item) => item.id === state.selectedId) || null;
+    }
+
+    function normalizeSchema() {
+        if (!state.schema || typeof state.schema !== 'object') state.schema = { modules: [] };
+        if (!Array.isArray(state.schema.modules)) state.schema.modules = [];
+    }
+
+    function moduleDefault(type) {
+        const id = type + '-' + Date.now();
+        if (type === 'bio') {
+            return { id, type: 'bio', title: '作者简介', content: '' };
+        }
+        if (type === 'timeline') {
+            return { id, type: 'timeline', title: '创作时间轴', show_chapter_name: true, limit: 8 };
+        }
+        return { id, type: 'works', title: '作品陈列柜', style: 'grid', sort: 'updated', limit: 6 };
+    }
+
+    function formatDate(iso) {
+        if (!iso) return '';
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return '';
+        return date.toLocaleString('zh-CN', { hour12: false });
+    }
+
+    function renderWorks(module) {
+        let list = workspaces.slice();
+        if (module.sort === 'name') {
+            list.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'zh-CN'));
+        } else {
+            list.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+        }
+        const limit = Math.max(1, Math.min(24, Number(module.limit) || 6));
+        list = list.slice(0, limit);
+
+        if (!list.length) {
+            return '<p class="text-muted">暂无公开作品。</p>';
+        }
+
+        if (module.style === 'list') {
+            return '<ul class="homepage-timeline">' + list.map((item) =>
+                '<li><a href="' + item.read_url + '">' + item.title + '</a> · 更新于 ' + formatDate(item.updated_at) + '</li>'
+            ).join('') + '</ul>';
+        }
+
+        return '<div class="homepage-work-grid">' + list.map((item) =>
+            '<article class="homepage-work-card">' +
+            '<div class="card-head">' +
+            '<div class="card-title-group">' +
+            '<img src="' + (item.cover_url || '/static/images/default-cover.png') + '" class="card-cover" alt="" onerror="this.src=\'/static/images/default-cover.png\';this.onerror=null;">' +
+            '<div class="card-title-info">' +
+            '<span class="card-label">WORKSPACE</span>' +
+            '<h4><a href="' + item.read_url + '">' + item.title + '</a></h4>' +
+            '</div>' +
+            '</div>' +
+            '<span class="card-badge">' + (item.visibility_label || '公开') + '</span>' +
+            '</div>' +
+            '<p class="card-summary">' + (item.summary || '暂无简介') + '</p>' +
+            '<p class="card-time">更新于 ' + formatDate(item.updated_at) + '</p>' +
+            '<div class="card-actions">' +
+            '<a class="card-btn primary" href="' + item.read_url + '">阅读</a>' +
+            '<a class="card-btn secondary" href="/workspace/' + item.id + '/">进入工作区</a>' +
+            '</div>' +
+            '</article>'
+        ).join('') + '</div>';
+    }
+
+    function renderBio(module) {
+        const text = String(module.content || '').trim();
+        if (!text) return '<p class="text-muted">暂无简介内容。</p>';
+        return '<div class="homepage-bio"><p>' + text.replace(/\n/g, '<br>') + '</p></div>';
+    }
+
+    function renderTimeline(module) {
+        const limit = Math.max(1, Math.min(30, Number(module.limit) || 8));
+        const list = timeline.slice(0, limit);
+        if (!list.length) {
+            return '<p class="text-muted">暂无创作动态。</p>';
+        }
+        return '<ol class="homepage-timeline">' + list.map((item) => {
+            const title = module.show_chapter_name === false ? item.workspace_title : (item.workspace_title + ' · ' + item.title);
+            return '<li>' + title + ' · ' + formatDate(item.updated_at) + '</li>';
+        }).join('') + '</ol>';
+    }
+
+    function renderCanvas() {
+        normalizeSchema();
+        if (!canvas) return;
+        if (!state.schema.modules.length) {
+            canvas.innerHTML = '<article class="homepage-module"><p class="text-muted">还没有模块，先从左侧组件库添加一个。</p></article>';
+            return;
+        }
+
+        canvas.innerHTML = state.schema.modules.map((module) => {
+            const selected = state.selectedId === module.id ? ' is-selected' : '';
+            let body = '<p class="text-muted">暂不支持该模块类型。</p>';
+            if (module.type === 'works') body = renderWorks(module);
+            if (module.type === 'bio') body = renderBio(module);
+            if (module.type === 'timeline') body = renderTimeline(module);
+
+            return '<article class="homepage-module' + selected + '" data-module-id="' + module.id + '"' + (isEditing ? ' draggable="true"' : '') + '>' +
+                '<header class="homepage-module-head"><h3>' + (module.title || '未命名模块') + '</h3>' +
+                (isEditing ? '<div style="display:flex;align-items:center;gap:8px;"><button type="button" class="button secondary btn-sm ah-edit-module" data-id="' + module.id + '" title="配置"><i class="ph ph-pencil-simple"></i> 编辑</button><i class="ph ph-dots-six drag-handle" style="cursor:grab; font-size:1.2rem; color:var(--muted);" title="按住拖拽排序"></i></div>' : '') + '</header>' +
+                body +
+                '</article>';
+        }).join('');
+    }
+
+    function syncSettings() {
+        if (!isEditing || !el.settingsForm || !el.settingsEmpty) return;
+        const module = selectedModule();
+        if (!module) {
+            el.settingsForm.hidden = true;
+            el.settingsEmpty.hidden = false;
+            return;
+        }
+
+        el.settingsEmpty.hidden = true;
+        el.settingsForm.hidden = false;
+        el.fieldTitle.value = module.title || '';
+
+        el.fieldStyleWrap.hidden = module.type !== 'works';
+        el.fieldSortWrap.hidden = module.type !== 'works';
+        el.fieldLimitWrap.hidden = module.type !== 'works' && module.type !== 'timeline';
+        el.fieldBioWrap.hidden = module.type !== 'bio';
+        el.fieldShowChapterWrap.hidden = module.type !== 'timeline';
+
+        if (module.type === 'works') {
+            el.fieldStyle.value = module.style || 'grid';
+            el.fieldSort.value = module.sort || 'updated';
+            el.fieldLimit.value = module.limit || 6;
+        }
+        if (module.type === 'timeline') {
+            el.fieldLimit.value = module.limit || 8;
+            el.fieldShowChapter.checked = module.show_chapter_name !== false;
+        }
+        if (module.type === 'bio') {
+            el.fieldBio.value = module.content || '';
+        }
+    }
+
+    async function fetchJson(url, init) {
+        const request = { credentials: 'same-origin', ...init };
+        const response = typeof fetchWithAuthRetry === 'function'
+            ? await fetchWithAuthRetry(url, request)
+            : await fetch(url, request);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(data.detail || '请求失败');
+        }
+        return data;
+    }
+
+    async function saveDraft() {
+        normalizeSchema();
+        await fetchJson('/api/customization/homepage-configs/mine/', {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken,
+            },
+            body: JSON.stringify({
+                page_schema_draft: state.schema,
+                author_bio: el.pageBio ? el.pageBio.value : '',
+            }),
+        });
+    }
+
+    async function publishDraft() {
+        await fetchJson('/api/customization/homepage-configs/publish/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrftoken,
+            },
+        });
+    }
+
+    if (isEditing) {
+        if (el.moduleLibrary) {
+            el.moduleLibrary.addEventListener('click', (event) => {
+                const btn = event.target.closest('[data-add-module]');
+                if (!btn) return;
+                const module = moduleDefault(btn.dataset.addModule);
+                state.schema.modules.push(module);
+                state.selectedId = module.id;
+                renderCanvas();
+                syncSettings();
+            });
+        }
+
+                let draggedModuleId = null;
+
+        if (canvas) {
+            canvas.addEventListener('click', (event) => {
+                const editBtn = event.target.closest('.ah-edit-module');
+                if (editBtn) {
+                    state.selectedId = editBtn.dataset.id;
+                    renderCanvas();
+                    syncSettings();
+                    document.querySelector('.ah-builder-drawer').classList.add('is-open');
+                    return;
+                }
+            });
+
+            canvas.addEventListener('dragstart', (e) => {
+                const node = e.target.closest('[data-module-id]');
+                if (!node) return;
+                draggedModuleId = node.dataset.moduleId;
+                node.classList.add('is-dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                // e.dataTransfer.setDragImage(node, 20, 20); // Let browser handle it naturally
+            });
+
+            canvas.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const node = e.target.closest('[data-module-id]');
+                if (!node || node.dataset.moduleId === draggedModuleId) return;
+                e.dataTransfer.dropEffect = 'move';
+                node.classList.add('drag-over');
+            });
+
+            canvas.addEventListener('dragleave', (e) => {
+                const node = e.target.closest('[data-module-id]');
+                if (node) node.classList.remove('drag-over');
+            });
+
+            canvas.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const targetNode = e.target.closest('[data-module-id]');
+                
+                if (!targetNode || !draggedModuleId || targetNode.dataset.moduleId === draggedModuleId) {
+                    document.querySelectorAll('.homepage-module').forEach(el => el.classList.remove('is-dragging', 'drag-over'));
+                    draggedModuleId = null;
+                    return;
+                }
+                
+                const targetId = targetNode.dataset.moduleId;
+                const list = state.schema.modules;
+                const fromIdx = list.findIndex((item) => item.id === draggedModuleId);
+                const toIdx = list.findIndex((item) => item.id === targetId);
+                
+                if (fromIdx > -1 && toIdx > -1) {
+                    const item = list.splice(fromIdx, 1)[0];
+                    // Insert before or after based on original position roughly
+                    list.splice(toIdx, 0, item);
+                    renderCanvas();
+                    syncSettings();
+                }
+                
+                document.querySelectorAll('.homepage-module').forEach(el => el.classList.remove('is-dragging', 'drag-over'));
+                draggedModuleId = null;
+            });
+
+            canvas.addEventListener('dragend', (e) => {
+                document.querySelectorAll('.homepage-module').forEach(el => el.classList.remove('is-dragging', 'drag-over'));
+                draggedModuleId = null;
+            });
+        }
+
+        if (el.fieldTitle) {
+            el.fieldTitle.addEventListener('input', () => {
+                const module = selectedModule();
+                if (!module) return;
+                module.title = el.fieldTitle.value;
+                renderCanvas();
+            });
+        }
+
+        if (el.fieldStyle) {
+            el.fieldStyle.addEventListener('change', () => {
+                const module = selectedModule();
+                if (!module) return;
+                module.style = el.fieldStyle.value;
+                renderCanvas();
+            });
+        }
+
+        if (el.fieldSort) {
+            el.fieldSort.addEventListener('change', () => {
+                const module = selectedModule();
+                if (!module) return;
+                module.sort = el.fieldSort.value;
+                renderCanvas();
+            });
+        }
+
+        if (el.fieldLimit) {
+            el.fieldLimit.addEventListener('input', () => {
+                const module = selectedModule();
+                if (!module) return;
+                module.limit = Number(el.fieldLimit.value) || module.limit || 6;
+                renderCanvas();
+            });
+        }
+
+        if (el.fieldBio) {
+            el.fieldBio.addEventListener('input', () => {
+                const module = selectedModule();
+                if (!module) return;
+                module.content = el.fieldBio.value;
+                renderCanvas();
+            });
+        }
+
+        if (el.fieldShowChapter) {
+            el.fieldShowChapter.addEventListener('change', () => {
+                const module = selectedModule();
+                if (!module) return;
+                module.show_chapter_name = el.fieldShowChapter.checked;
+                renderCanvas();
+            });
+        }
+
+        if (el.moveUp && false) {
+            el.moveUp.addEventListener('click', () => {
+                const list = state.schema.modules;
+                const idx = list.findIndex((item) => item.id === state.selectedId);
+                if (idx <= 0) return;
+                [list[idx - 1], list[idx]] = [list[idx], list[idx - 1]];
+                renderCanvas();
+            });
+        }
+
+        if (el.moveDown && false) {
+            el.moveDown.addEventListener('click', () => {
+                const list = state.schema.modules;
+                const idx = list.findIndex((item) => item.id === state.selectedId);
+                if (idx < 0 || idx >= list.length - 1) return;
+                [list[idx], list[idx + 1]] = [list[idx + 1], list[idx]];
+                renderCanvas();
+            });
+        }
+
+        if (el.removeModule) {
+            el.removeModule.addEventListener('click', () => {
+                state.schema.modules = state.schema.modules.filter((item) => item.id !== state.selectedId);
+                state.selectedId = null;
+                renderCanvas();
+                syncSettings();
+            });
+        }
+
+        if (el.saveDraft) {
+            el.saveDraft.addEventListener('click', async () => {
+                try {
+                    setStatus('保存中...');
+                    await saveDraft();
+                    setStatus('草稿已保存');
+                } catch (error) {
+                    setStatus(error.message || '保存失败', true);
+                }
+            });
+        }
+
+
+        if (el.toolbarSaveBtn) {
+            el.toolbarSaveBtn.addEventListener('click', () => {
+                if (el.saveDraft) el.saveDraft.click();
+            });
+        }
+        if (el.toolbarPublishBtn) {
+            el.toolbarPublishBtn.addEventListener('click', () => {
+                if (el.publish) el.publish.click();
+            });
+        }
+        
+        const closeToolbarBtn = document.getElementById('ah-close-toolbar');
+        const fabToggle = document.getElementById('ah-fab-toggle');
+        if (closeToolbarBtn) {
+            closeToolbarBtn.addEventListener('click', () => {
+                const tb = document.getElementById('ah-floating-toolbar');
+                if (tb) tb.style.display = 'none';
+                if (fabToggle) fabToggle.hidden = false;
+                // Also close drawer if it's open
+                if (el.drawer) el.drawer.classList.remove('is-open');
+            });
+        }
+        if (fabToggle) {
+            fabToggle.addEventListener('click', () => {
+                const tb = document.getElementById('ah-floating-toolbar');
+                if (tb) tb.style.display = 'flex';
+                fabToggle.hidden = true;
+            });
+        }
+        
+        if (el.addModuleBtn) {
+            el.addModuleBtn.addEventListener('click', () => {
+                state.selectedId = null;
+                renderCanvas();
+                syncSettings();
+                if (el.drawer) el.drawer.classList.add('is-open');
+            });
+        }
+        
+        if (el.closeDrawerBtn) {
+            el.closeDrawerBtn.addEventListener('click', () => {
+                if (el.drawer) el.drawer.classList.remove('is-open');
+            });
+        }
+
+        if (el.publish) {
+            el.publish.addEventListener('click', async () => {
+                try {
+                    setStatus('发布中...');
+                    await saveDraft();
+                    await publishDraft();
+                    setStatus('已发布更新');
+                } catch (error) {
+                    setStatus(error.message || '发布失败', true);
+                }
+            });
+        }
+    }
+
+
+        // Image Upload Logic added here
+        if (el.btnHeader) {
+            el.btnHeader.addEventListener('click', async () => {
+                if (!el.headerInput || !el.headerInput.files.length) {
+                    setStatus('请先选择头图文件', true);
+                    return;
+                }
+                const formData = new FormData();
+                formData.append('header_image', el.headerInput.files[0]);
+
+                try {
+                    setStatus('上传头图中...');
+                    el.btnHeader.disabled = true;
+                    // API path mapped from viewset
+                    const res = await fetch('/api/customization/homepage-configs/upload_header/', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrftoken
+                        },
+                        body: formData
+                    });
+                    if (res.ok) {
+                        setStatus('头图上传成功', false);
+                        setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        const errText = await res.text();
+                        throw new Error(errText);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    setStatus('上传失败: ' + err.message, true);
+                } finally {
+                    el.btnHeader.disabled = false;
+                }
+            });
+        }
+
+        if (el.btnAvatar) {
+            el.btnAvatar.addEventListener('click', async () => {
+                if (!el.avatarInput || !el.avatarInput.files.length) {
+                    setStatus('请先选择头像文件', true);
+                    return;
+                }
+                const formData = new FormData();
+                formData.append('avatar', el.avatarInput.files[0]);
+
+                try {
+                    setStatus('上传头像中...');
+                    el.btnAvatar.disabled = true;
+                    const res = await fetch('/api/customization/homepage-configs/upload_avatar/', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrftoken
+                        },
+                        body: formData
+                    });
+                    if (res.ok) {
+                        setStatus('头像上传成功', false);
+                        setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        const errText = await res.text();
+                        throw new Error(errText);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    setStatus('上传失败: ' + err.message, true);
+                } finally {
+                    el.btnAvatar.disabled = false;
+                }
+            });
+        }
+
+    renderCanvas();
+    syncSettings();
+})();
+</script>
 {% endblock %}

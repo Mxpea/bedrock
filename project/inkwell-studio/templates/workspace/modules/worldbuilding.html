@@ -69,8 +69,35 @@
             </section>
 
             <section class="worldview-v2-content">
-                <h3>正文（Markdown）</h3>
-                <textarea id="wv-content" rows="16" placeholder="支持 [[词条名]] 语法建立双向链接"></textarea>
+                <div class="worldview-v2-content-head">
+                    <h3>正文（Markdown）</h3>
+                    <div class="worldview-v2-content-mode">
+                        <button id="wv-content-view" type="button" class="button secondary active">查看渲染</button>
+                        <button id="wv-content-edit" type="button" class="button secondary">编辑正文</button>
+                    </div>
+                </div>
+
+                <div id="wv-md-toolbar" class="worldview-v2-md-toolbar" hidden>
+                    <div class="worldview-v2-md-tools">
+                        <button type="button" class="button secondary" id="wv-md-h1">H1</button>
+                        <button type="button" class="button secondary" id="wv-md-bold">加粗</button>
+                        <button type="button" class="button secondary" id="wv-md-italic">斜体</button>
+                        <button type="button" class="button secondary" id="wv-md-list">列表</button>
+                        <button type="button" class="button secondary" id="wv-md-quote">引用</button>
+                        <button type="button" class="button secondary" id="wv-md-code">代码</button>
+                    </div>
+                    <div class="worldview-v2-md-tools">
+                        <select id="wv-link-target" class="worldview-v2-md-select"></select>
+                        <button type="button" class="button secondary" id="wv-insert-link">快速内部链接</button>
+                        <select id="wv-backlink-target" class="worldview-v2-md-select"></select>
+                        <button type="button" class="button secondary" id="wv-insert-backlink">快速反向链接</button>
+                        <button type="button" class="button secondary" id="wv-upload-image">上传图片</button>
+                        <input id="wv-image-input" type="file" accept="image/*" hidden>
+                    </div>
+                </div>
+
+                <textarea id="wv-content" rows="16" placeholder="支持 [[词条名]] 语法建立双向链接" hidden></textarea>
+                <div id="wv-content-preview" class="worldview-v2-content-preview"></div>
             </section>
 
             <section class="worldview-v2-backlinks">
@@ -84,7 +111,7 @@
         <section id="wv-search-center" class="wv-search-center" hidden>
             <div class="wv-search-center-head">
                 <h2>强检索中心</h2>
-                <button id="wv-close-search" type="button" class="button secondary">返回编辑器</button>
+                <a id="wv-close-search" class="button secondary" href="/workspace/{{ workspace.id }}/worldbuilding/">返回编辑器</a>
             </div>
 
             <div class="wv-search-grid">
@@ -224,6 +251,100 @@
     color: var(--text);
     cursor: pointer;
     font-size: 0.83rem;
+}
+
+.worldview-v2-tree-row {
+    display: flex;
+    align-items: stretch;
+    min-height: 30px;
+}
+
+.worldview-v2-tree-rails {
+    display: inline-flex;
+    align-items: stretch;
+    flex: 0 0 auto;
+}
+
+.worldview-v2-tree-rail {
+    width: 18px;
+    position: relative;
+}
+
+.worldview-v2-tree-rail.on::before {
+    content: '';
+    position: absolute;
+    left: 9px;
+    top: -6px;
+    bottom: -6px;
+    width: 1px;
+    background: color-mix(in srgb, var(--muted) 42%, transparent);
+}
+
+.worldview-v2-tree-folder-row {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+}
+
+.worldview-v2-folder-toggle {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0;
+    width: 18px;
+    height: 18px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    position: relative;
+}
+
+.worldview-v2-folder-toggle:hover {
+    background: color-mix(in srgb, var(--accent) 10%, #fff);
+    color: var(--accent-strong);
+}
+
+.worldview-v2-tree-entry {
+    border: none;
+    background: transparent;
+    text-align: left;
+    border-radius: 8px;
+    padding: 6px 8px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.82rem;
+    flex: 1;
+}
+
+.worldview-v2-tree-entry:hover {
+    background: color-mix(in srgb, var(--accent) 8%, #fff);
+}
+
+.worldview-v2-tree-entry.active {
+    background: color-mix(in srgb, var(--accent) 12%, #fff);
+    color: var(--accent-strong);
+    font-weight: 600;
+}
+
+.worldview-v2-folder-root {
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.worldview-v2-folder-node.is-drop-target,
+.worldview-v2-tree-entry.is-drop-target,
+.worldview-v2-folder-root.is-drop-target {
+    outline: 1px dashed var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, #fff);
+}
+
+.worldview-v2-tree-entry.dragging {
+    opacity: 0.6;
 }
 
 .worldview-v2-folder-node:hover {
@@ -397,6 +518,79 @@
     resize: vertical;
 }
 
+.worldview-v2-content-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.worldview-v2-content-head h3 {
+    margin: 0;
+}
+
+.worldview-v2-content-mode {
+    display: inline-flex;
+    gap: 6px;
+}
+
+.worldview-v2-content-mode .button.active {
+    border-color: var(--accent);
+    color: var(--accent-strong);
+    background: color-mix(in srgb, var(--accent) 10%, #fff);
+}
+
+.worldview-v2-md-toolbar {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.worldview-v2-md-toolbar[hidden] {
+    display: none !important;
+}
+
+.worldview-v2-md-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.worldview-v2-md-select {
+    min-width: 160px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 8px;
+    background: #fff;
+}
+
+.worldview-v2-content-preview {
+    min-height: 280px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+    background: #fff;
+    line-height: 1.72;
+}
+
+.worldview-v2-content-preview p {
+    margin: 0 0 10px;
+}
+
+.worldview-v2-content-preview pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+.worldview-v2-content-preview img {
+    max-width: 100%;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+}
+
 .worldview-v2-backlinks-list {
     display: grid;
     gap: 8px;
@@ -425,6 +619,10 @@
     display: grid;
     grid-template-rows: auto auto auto minmax(0, 1fr);
     gap: 14px;
+}
+
+.wv-search-center[hidden] {
+    display: none !important;
 }
 
 .wv-search-center-head {
@@ -528,4 +726,3 @@
 }
 </style>
 
-<script src="/static/js/worldview-wiki.js"></script>

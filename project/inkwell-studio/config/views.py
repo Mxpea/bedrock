@@ -3,10 +3,11 @@ from django.contrib.auth import get_user_model
 from django.db import models
 from django.http import Http404
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.views.generic import TemplateView
 
 from apps.customization.markdown_extensions import sanitize_advanced_content, sanitize_standard_content
-from apps.customization.models import ThemeConfig
+from apps.customization.models import AuthorHomepageConfig, ThemeConfig
 from apps.novels.models import Chapter, Novel
 
 User = get_user_model()
@@ -173,11 +174,71 @@ class ReaderPageView(TemplateView):
 class AuthorProfilePageView(TemplateView):
     template_name = "author_profile.html"
 
+    def _default_schema(self):
+        return {
+            "modules": [
+                {
+                    "id": "works-default",
+                    "type": "works",
+                    "title": "作品陈列柜",
+                    "style": "grid",
+                    "sort": "updated",
+                    "limit": 6,
+                },
+                {
+                    "id": "bio-default",
+                    "type": "bio",
+                    "title": "作者简介",
+                    "content": "",
+                },
+                {
+                    "id": "timeline-default",
+                    "type": "timeline",
+                    "title": "创作时间轴",
+                    "show_chapter_name": True,
+                    "limit": 8,
+                },
+            ]
+        }
+
+    def _serialize_workspaces(self, queryset):
+        items = []
+        for workspace in queryset:
+            items.append(
+                {
+                    "id": workspace.id,
+                    "title": workspace.title,
+                    "summary": workspace.summary or "",
+                    "cover_url": workspace.icon.url if workspace.icon else "",
+                    "visibility": workspace.visibility,
+                    "visibility_label": workspace.get_visibility_display(),
+                    "updated_at": workspace.updated_at.isoformat() if workspace.updated_at else "",
+                    "chapter_count": workspace.chapters.filter(is_published=True).count(),
+                    "read_url": f"/reader/?workspace_id={workspace.id}",
+                }
+            )
+        return items
+
+    def _serialize_timeline(self, chapter_queryset):
+        result = []
+        for chapter in chapter_queryset:
+            result.append(
+                {
+                    "id": chapter.id,
+                    "title": chapter.title,
+                    "workspace_title": chapter.novel.title,
+                    "updated_at": chapter.updated_at.isoformat() if chapter.updated_at else "",
+                    "url": f"/reader/{chapter.id}/",
+                }
+            )
+        return result
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         username = kwargs.get("username")
         profile_user = get_object_or_404(User, username=username)
         is_owner = self.request.user.is_authenticated and self.request.user == profile_user
+        decorate_mode = is_owner and self.request.GET.get("decorate") == "1"
 
         base_workspaces = Novel.objects.filter(author=profile_user, is_deleted=False)
         public_workspaces = base_workspaces.filter(visibility__in=[Novel.Visibility.PUBLIC, Novel.Visibility.LINK])
@@ -189,15 +250,28 @@ class AuthorProfilePageView(TemplateView):
 
         public_workspaces_count = public_workspaces.count()
         public_chapters_count = Chapter.objects.filter(novel__in=public_workspaces, is_published=True).count()
-        from django.utils import timezone
         days_joined = (timezone.now() - profile_user.date_joined).days
+        timeline_qs = Chapter.objects.filter(novel__in=public_workspaces, is_published=True).select_related("novel").order_by("-updated_at")[:20]
+
+        homepage_config, _ = AuthorHomepageConfig.objects.get_or_create(author=profile_user)
+        default_schema = self._default_schema()
+        published_schema = homepage_config.page_schema_published or default_schema
+        draft_schema = homepage_config.page_schema_draft or published_schema
+        active_schema = draft_schema if decorate_mode else published_schema
 
         context.update({
             "profile_user": profile_user,
             "is_owner": is_owner,
+            "decorate_mode": decorate_mode,
             "workspaces": workspaces,
             "public_workspaces_count": public_workspaces_count,
             "public_chapters_count": public_chapters_count,
             "days_joined": days_joined,
+            "homepage_config": homepage_config,
+            "homepage_schema": active_schema,
+            "homepage_schema_published": published_schema,
+            "homepage_schema_draft": draft_schema,
+            "homepage_modules_payload": self._serialize_workspaces(public_workspaces.order_by("-updated_at")),
+            "homepage_timeline_payload": self._serialize_timeline(timeline_qs),
         })
         return context

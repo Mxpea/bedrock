@@ -1,3 +1,7 @@
+from PIL import Image
+from io import BytesIO
+from uuid import uuid4
+from django.core.files.base import ContentFile
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -175,6 +179,92 @@ class AuthorHomepageConfigViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
+    @action(detail=False, methods=["get", "patch"], permission_classes=[permissions.IsAuthenticated])
+    def mine(self, request):
+        config, _ = AuthorHomepageConfig.objects.get_or_create(author=request.user)
+        if request.method == "GET":
+            serializer = self.get_serializer(config)
+            return Response(serializer.data)
+
+        serializer = self.get_serializer(config, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(author=request.user)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    def publish(self, request):
+        config, _ = AuthorHomepageConfig.objects.get_or_create(author=request.user)
+        config.page_schema_published = config.page_schema_draft or {}
+        config.save(update_fields=["page_schema_published", "updated_at"])
+        serializer = self.get_serializer(config)
+        return Response(serializer.data)
+
+
+
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def upload_header(self, request):
+        config, _ = AuthorHomepageConfig.objects.get_or_create(author=request.user)
+        image_file = request.FILES.get("header_image")
+        if not image_file:
+            return Response({"detail": "未上头图"}, status=status.HTTP_400_BAD_REQUEST)
+        if config.header_image:
+            config.header_image.delete(save=False)
+        config.header_image = image_file
+        config.save(update_fields=["header_image", "updated_at"])
+        serializer = self.get_serializer(config)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def upload_avatar(self, request):
+        config, _ = AuthorHomepageConfig.objects.get_or_create(author=request.user)
+        image_file = request.FILES.get("avatar")
+        if not image_file:
+            return Response({"detail": "未上传头像"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            img = Image.open(image_file)
+            
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+                
+            width, height = img.size
+            new_size = min(width, height)
+            left = (width - new_size) / 2
+            top = (height - new_size) / 2
+            right = (width + new_size) / 2
+            bottom = (height + new_size) / 2
+            
+            img = img.crop((left, top, right, bottom))
+            
+            img = img.resize((512, 512), Image.Resampling.LANCZOS)
+            
+            img_io = BytesIO()
+            img.save(img_io, format='JPEG', quality=90)
+            file_name = f"{request.user.username}_avatar_{uuid4().hex[:8]}.jpg"
+            img_content = ContentFile(img_io.getvalue(), name=file_name)
+            
+            if config.avatar:
+                config.avatar.delete(save=False)
+                
+            config.avatar = img_content
+            config.save(update_fields=["avatar", "updated_at"])
+            
+            serializer = self.get_serializer(config)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({"detail": f"头像处理失败: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class CSSSecurityEventViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):

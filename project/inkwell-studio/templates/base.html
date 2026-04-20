@@ -9,6 +9,7 @@
     <script defer src="{% static 'js/site.js' %}?v={% now 'U' %}"></script>
 </head>
 <body>
+    <div hidden aria-hidden="true">{% csrf_token %}</div>
     <header class="topbar" id="global-topbar">
         <a class="brand" href="/">Bedrock</a>
         <nav class="topnav" id="global-nav">

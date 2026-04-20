@@ -140,22 +140,26 @@ class Character(TimeStampedModel):
 
         return hits
 
+
 class WorldviewEntry(TimeStampedModel):
     novel = models.ForeignKey(Novel, on_delete=models.CASCADE, related_name="worldview_entries")
     name = models.CharField(max_length=120)
+    folder_path = models.CharField(max_length=255, blank=True, default="", db_index=True)
     aliases = models.JSONField(default=list, blank=True)
     category = models.CharField(max_length=50, blank=True, db_index=True)
+    tags = models.JSONField(default=list, blank=True)
     properties = models.JSONField(default=dict, blank=True)
     content_md = models.TextField(blank=True)
     content_html = models.TextField(blank=True)
-    tags = models.JSONField(default=list, blank=True)
+    plain_content = models.TextField(blank=True)
 
     class Meta:
-        ordering = ["-updated_at"]
+        ordering = ["name", "id"]
         unique_together = ("novel", "name")
 
     def __str__(self) -> str:
-        return f"{self.novel.title} - [Worldview] {self.name}"
+        return f"{self.novel.title}-世界观-{self.name}"
+
 
 class WorldviewLink(TimeStampedModel):
     novel = models.ForeignKey(Novel, on_delete=models.CASCADE, related_name="worldview_links")
@@ -164,6 +168,7 @@ class WorldviewLink(TimeStampedModel):
     context = models.CharField(max_length=255, blank=True)
 
     class Meta:
+        ordering = ["source_id", "target_id"]
         unique_together = ("source", "target")
 
     def __str__(self) -> str:

@@ -1,5 +1,16 @@
 
 document.addEventListener('DOMContentLoaded', () => {
+    const getCookie = (name) => {
+        const cookies = document.cookie ? document.cookie.split(';') : [];
+        for (const raw of cookies) {
+            const cookie = raw.trim();
+            if (cookie.startsWith(name + '=')) {
+                return decodeURIComponent(cookie.slice(name.length + 1));
+            }
+        }
+        return '';
+    };
+
     const editor = document.getElementById('main-editor-area');
     const titleInput = document.getElementById('chapter-title-input');
     if (!editor) {
@@ -591,6 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const checkAuth = () => localStorage.getItem("bedrock_access");
+    const csrftoken = getCookie('csrftoken');
 
     let previewDebounceTimer = null;
 
@@ -600,10 +612,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const token = checkAuth();
-        if (!token) {
-            livePreviewBody.innerHTML = '<p class="text-muted">请先登录后使用实时预览。</p>';
-            return;
-        }
 
         const payload = {
             content_md: editor.value || '',
@@ -611,17 +619,31 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            const response = await fetch('/api/chapters/render_preview/', {
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            if (token) {
+                headers.Authorization = `Bearer ${token}`;
+            }
+            if (csrftoken) {
+                headers['X-CSRFToken'] = csrftoken;
+            }
+
+            const requestInit = {
                 method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
+                credentials: 'same-origin',
+                headers,
                 body: JSON.stringify(payload),
-            });
+            };
+
+            const response = typeof fetchWithAuthRetry === 'function'
+                ? await fetchWithAuthRetry('/api/chapters/render_preview/', requestInit)
+                : await fetch('/api/chapters/render_preview/', requestInit);
 
             if (!response.ok) {
-                livePreviewBody.innerHTML = '<p class="text-muted">预览渲染失败，请稍后重试。</p>';
+                const data = await response.json().catch(() => ({}));
+                const detail = data && (data.detail || data.message || data.error);
+                livePreviewBody.innerHTML = `<p class="text-muted">预览渲染失败${detail ? `：${String(detail)}` : '，请稍后重试。'}</p>`;
                 return;
             }
 

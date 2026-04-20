@@ -47,7 +47,42 @@
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
             const detail = data && (data.detail || data.message || data.error);
-            throw new Error(detail || '请求失败');
+            if (detail) {
+                throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+            }
+
+            if (data && typeof data === 'object') {
+                const firstField = Object.keys(data)[0];
+                const value = data[firstField];
+                if (Array.isArray(value) && value.length) {
+                    throw new Error(String(value[0]));
+                }
+                if (typeof value === 'string' && value.trim()) {
+                    throw new Error(value);
+                }
+            }
+
+            throw new Error('请求失败（HTTP ' + response.status + '）');
+        }
+        return data;
+    }
+
+    async function requestFormJson(url, formData, init = {}) {
+        const request = {
+            credentials: 'same-origin',
+            method: 'POST',
+            body: formData,
+            ...init,
+        };
+
+        const response = typeof fetchWithAuthRetry === 'function'
+            ? await fetchWithAuthRetry(url, request)
+            : await fetch(url, request);
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            const detail = data && (data.detail || data.message || data.error);
+            throw new Error(detail || ('请求失败（HTTP ' + response.status + '）'));
         }
         return data;
     }
@@ -57,8 +92,14 @@
         if (!app) {
             return;
         }
+        if (app.dataset.wvInitialized === '1') {
+            return;
+        }
+        app.dataset.wvInitialized = '1';
 
         const apiBase = app.dataset.apiBase;
+        const renderPreviewApi = '/api/chapters/render_preview/';
+        const uploadImageApi = '/api/chapters/upload_image/';
         const workspaceId = app.dataset.workspaceId;
         const csrftoken = getCookie('csrftoken');
 
@@ -79,6 +120,22 @@
             folderPath: document.getElementById('wv-folder-path'),
             tagsInput: document.getElementById('wv-tags-input'),
             content: document.getElementById('wv-content'),
+            contentPreview: document.getElementById('wv-content-preview'),
+            contentViewBtn: document.getElementById('wv-content-view'),
+            contentEditBtn: document.getElementById('wv-content-edit'),
+            mdToolbar: document.getElementById('wv-md-toolbar'),
+            mdH1: document.getElementById('wv-md-h1'),
+            mdBold: document.getElementById('wv-md-bold'),
+            mdItalic: document.getElementById('wv-md-italic'),
+            mdList: document.getElementById('wv-md-list'),
+            mdQuote: document.getElementById('wv-md-quote'),
+            mdCode: document.getElementById('wv-md-code'),
+            linkTarget: document.getElementById('wv-link-target'),
+            backlinkTarget: document.getElementById('wv-backlink-target'),
+            insertLink: document.getElementById('wv-insert-link'),
+            insertBacklink: document.getElementById('wv-insert-backlink'),
+            uploadImage: document.getElementById('wv-upload-image'),
+            imageInput: document.getElementById('wv-image-input'),
             addProp: document.getElementById('wv-add-prop'),
             props: document.getElementById('wv-props'),
             backlinks: document.getElementById('wv-backlinks'),
@@ -106,9 +163,149 @@
             searchCenterOpen: false,
             activeFolder: '',
             customFolders: [],
+            collapsedFolders: new Set(),
+            contentMode: 'view',
+            previewTimer: null,
         };
 
+        function setContentMode(mode) {
+            state.contentMode = mode === 'edit' ? 'edit' : 'view';
+
+            const isEdit = state.contentMode === 'edit';
+            if (el.content) el.content.hidden = !isEdit;
+            if (el.mdToolbar) el.mdToolbar.hidden = !isEdit;
+            if (el.contentPreview) el.contentPreview.hidden = isEdit;
+
+            if (el.contentEditBtn) {
+                el.contentEditBtn.classList.toggle('active', isEdit);
+            }
+            if (el.contentViewBtn) {
+                el.contentViewBtn.classList.toggle('active', !isEdit);
+            }
+        }
+
+        function syncLinkTargets() {
+            if (!el.linkTarget || !el.backlinkTarget) return;
+            const current = selectedEntry();
+
+            const options = ['<option value="">选择词条...</option>'];
+            for (const item of state.entries) {
+                if (current && item.id === current.id) continue;
+                options.push('<option value="' + escapeHtml(item.name || '') + '">' + escapeHtml(item.name || '') + '</option>');
+            }
+            el.linkTarget.innerHTML = options.join('');
+
+            const backlinks = ['<option value="">选择反向来源...</option>'];
+            for (const link of (current?.incoming_links || [])) {
+                backlinks.push('<option value="' + escapeHtml(link.name || '') + '">' + escapeHtml(link.name || '') + '</option>');
+            }
+            el.backlinkTarget.innerHTML = backlinks.join('');
+        }
+
+        function insertAtCursor(insertText) {
+            if (!el.content || !insertText) return;
+            const input = el.content;
+            const start = input.selectionStart ?? input.value.length;
+            const end = input.selectionEnd ?? input.value.length;
+            const before = input.value.slice(0, start);
+            const after = input.value.slice(end);
+            input.value = before + insertText + after;
+            const cursor = start + insertText.length;
+            input.setSelectionRange(cursor, cursor);
+            input.focus();
+            schedulePreview();
+        }
+
+        function wrapSelection(prefix, suffix, placeholder) {
+            if (!el.content) return;
+            const input = el.content;
+            const start = input.selectionStart ?? 0;
+            const end = input.selectionEnd ?? 0;
+            const selected = input.value.slice(start, end);
+            const text = selected || (placeholder || '');
+            const replacement = prefix + text + suffix;
+
+            const before = input.value.slice(0, start);
+            const after = input.value.slice(end);
+            input.value = before + replacement + after;
+
+            const selectionStart = start + prefix.length;
+            const selectionEnd = selectionStart + text.length;
+            input.setSelectionRange(selectionStart, selectionEnd);
+            input.focus();
+            schedulePreview();
+        }
+
+        function toggleLinePrefix(prefix) {
+            if (!el.content) return;
+            const input = el.content;
+            const value = input.value;
+            const start = input.selectionStart ?? 0;
+            const end = input.selectionEnd ?? 0;
+
+            const lineStart = value.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+            const lineEndIndex = value.indexOf('\n', end);
+            const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
+            const block = value.slice(lineStart, lineEnd);
+            const lines = block.split('\n');
+
+            const nonEmpty = lines.filter((line) => line.trim().length > 0);
+            const allPrefixed = nonEmpty.length > 0 && nonEmpty.every((line) => line.startsWith(prefix));
+
+            const transformed = lines.map((line) => {
+                if (!line.trim()) {
+                    return line;
+                }
+                if (allPrefixed) {
+                    return line.startsWith(prefix) ? line.slice(prefix.length) : line;
+                }
+                return line.startsWith(prefix) ? line : prefix + line;
+            });
+
+            const replacement = transformed.join('\n');
+            input.value = value.slice(0, lineStart) + replacement + value.slice(lineEnd);
+            input.setSelectionRange(lineStart, lineStart + replacement.length);
+            input.focus();
+            schedulePreview();
+        }
+
+        async function renderMarkdownPreview() {
+            if (!el.contentPreview) return;
+            const content = (el.content?.value || '').trim();
+            if (!content) {
+                el.contentPreview.innerHTML = '<div class="text-muted">暂无正文，点击“编辑正文”开始写作。</div>';
+                return;
+            }
+
+            try {
+                const data = await requestJson(renderPreviewApi, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken,
+                    },
+                    body: JSON.stringify({
+                        novel: Number(workspaceId),
+                        content_md: el.content.value,
+                    }),
+                });
+                el.contentPreview.innerHTML = data.html || '<pre>' + escapeHtml(el.content.value) + '</pre>';
+            } catch (_) {
+                el.contentPreview.innerHTML = '<pre>' + escapeHtml(el.content.value) + '</pre>';
+            }
+        }
+
+        function schedulePreview() {
+            if (state.previewTimer) {
+                window.clearTimeout(state.previewTimer);
+            }
+            state.previewTimer = window.setTimeout(() => {
+                renderMarkdownPreview();
+            }, 250);
+        }
+
         const folderStorageKey = 'wv_custom_folders_' + workspaceId;
+        const folderCollapseStorageKey = 'wv_collapsed_folders_' + workspaceId;
 
         try {
             const cache = JSON.parse(localStorage.getItem(folderStorageKey) || '[]');
@@ -117,8 +314,20 @@
             state.customFolders = [];
         }
 
+        try {
+            const cache = JSON.parse(localStorage.getItem(folderCollapseStorageKey) || '[]');
+            const list = Array.isArray(cache) ? cache.map(normalizeFolderPath).filter(Boolean) : [];
+            state.collapsedFolders = new Set(list);
+        } catch (_) {
+            state.collapsedFolders = new Set();
+        }
+
         function persistCustomFolders() {
             localStorage.setItem(folderStorageKey, JSON.stringify(state.customFolders));
+        }
+
+        function persistCollapsedFolders() {
+            localStorage.setItem(folderCollapseStorageKey, JSON.stringify(Array.from(state.collapsedFolders)));
         }
 
         function collectFolderPaths() {
@@ -142,41 +351,178 @@
             return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-CN'));
         }
 
+        function buildFolderTree() {
+            const root = {
+                path: '',
+                name: '',
+                children: [],
+                entries: [],
+            };
+            const map = new Map();
+            map.set('', root);
+
+            function ensureFolder(path) {
+                const normalized = normalizeFolderPath(path);
+                if (map.has(normalized)) {
+                    return map.get(normalized);
+                }
+                const parts = normalized.split('/');
+                const name = parts.at(-1) || '';
+                const parentPath = parts.slice(0, -1).join('/');
+                const parent = ensureFolder(parentPath);
+                const node = {
+                    path: normalized,
+                    name,
+                    children: [],
+                    entries: [],
+                };
+                parent.children.push(node);
+                map.set(normalized, node);
+                return node;
+            }
+
+            for (const folder of collectFolderPaths()) {
+                ensureFolder(folder);
+            }
+
+            for (const entry of state.entries) {
+                const folder = normalizeFolderPath(entry.folder_path || '');
+                const parent = ensureFolder(folder);
+                parent.entries.push(entry);
+            }
+
+            const sortNode = (node) => {
+                node.children.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+                node.entries.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-CN'));
+                for (const child of node.children) {
+                    sortNode(child);
+                }
+            };
+            sortNode(root);
+            return root;
+        }
+
         function renderFolderTree() {
             if (!el.folderTree) return;
-            const folders = collectFolderPaths();
             const rows = [];
-            const allActive = state.activeFolder === '' ? ' active' : '';
-            rows.push('<button type="button" class="worldview-v2-folder-node' + allActive + '" data-folder="">全部词条</button>');
+            const tree = buildFolderTree();
 
-            for (const folder of folders) {
-                const depth = folder.split('/').length - 1;
-                const label = folder.split('/').at(-1);
-                const active = state.activeFolder === folder ? ' active' : '';
+            const allActive = state.activeFolder === '' ? ' active' : '';
+            rows.push(
+                '<button type="button" class="worldview-v2-folder-node worldview-v2-folder-root' + allActive + '" data-folder="" data-drop-folder="">📚 全部词条</button>'
+            );
+
+            function renderGuideRails(flags) {
+                if (!flags.length) {
+                    return '';
+                }
+                return '<span class="worldview-v2-tree-rails" aria-hidden="true">' +
+                    flags.map((on) => '<span class="worldview-v2-tree-rail' + (on ? ' on' : '') + '"></span>').join('') +
+                    '</span>';
+            }
+
+            function renderEntryRow(entry, depth, ancestorHasNext) {
+                const activeEntry = state.selectedId === entry.id ? ' active' : '';
                 rows.push(
-                    '<button type="button" class="worldview-v2-folder-node' + active + '" data-folder="' + escapeHtml(folder) + '" style="padding-left:' + (8 + depth * 16) + 'px">' +
-                    (depth ? '└ ' : '') + '📁 ' + escapeHtml(label) +
-                    '</button>'
+                    '<div class="worldview-v2-tree-row" data-depth="' + depth + '">' +
+                    renderGuideRails(ancestorHasNext) +
+                    '<button type="button" class="worldview-v2-tree-entry' + activeEntry + '" draggable="true" data-entry-id="' + entry.id + '">📄 ' + escapeHtml(entry.name || '未命名词条') + '</button>' +
+                    '</div>'
                 );
             }
+
+            function renderNode(node, depth, ancestorHasNext, isLastSibling) {
+                const hasChildren = node.children.length > 0 || node.entries.length > 0;
+                const isCollapsed = state.collapsedFolders.has(node.path);
+                const isActive = state.activeFolder === node.path ? ' active' : '';
+
+                rows.push(
+                    '<div class="worldview-v2-tree-row" data-depth="' + depth + '">' +
+                    renderGuideRails(ancestorHasNext) +
+                    '<div class="worldview-v2-tree-folder-row">' +
+                    '<button type="button" class="worldview-v2-folder-toggle" data-toggle-folder="' + escapeHtml(node.path) + '">' +
+                    (hasChildren ? (isCollapsed ? '▸' : '▾') : '•') +
+                    '</button>' +
+                    '<button type="button" class="worldview-v2-folder-node' + isActive + '" data-folder="' + escapeHtml(node.path) + '" data-drop-folder="' + escapeHtml(node.path) + '">📁 ' + escapeHtml(node.name) + '</button>' +
+                    '</div>' +
+                    '</div>'
+                );
+
+                if (isCollapsed) {
+                    return;
+                }
+
+                const childAncestor = ancestorHasNext.concat(!isLastSibling);
+                const children = [];
+                for (const entry of node.entries) {
+                    children.push({ type: 'entry', entry });
+                }
+                for (const child of node.children) {
+                    children.push({ type: 'folder', node: child });
+                }
+
+                children.forEach((child, index) => {
+                    const childIsLast = index === children.length - 1;
+                    if (child.type === 'entry') {
+                        renderEntryRow(child.entry, depth + 1, childAncestor);
+                        return;
+                    }
+                    renderNode(child.node, depth + 1, childAncestor, childIsLast);
+                });
+            }
+
+            const rootChildren = [];
+            for (const node of tree.children) {
+                rootChildren.push({ type: 'folder', node });
+            }
+            for (const entry of tree.entries) {
+                rootChildren.push({ type: 'entry', entry });
+            }
+
+            rootChildren.forEach((child, index) => {
+                const isLast = index === rootChildren.length - 1;
+                if (child.type === 'entry') {
+                    renderEntryRow(child.entry, 1, []);
+                    return;
+                }
+                renderNode(child.node, 1, [], isLast);
+            });
+
             el.folderTree.innerHTML = rows.join('');
         }
 
-        function getSearchViewMode() {
-            const params = new URLSearchParams(window.location.search);
-            return params.get('view') === 'search';
-        }
+        async function moveEntryToFolder(entryId, targetFolder) {
+            const entry = state.entries.find((item) => item.id === Number(entryId));
+            if (!entry) return;
+            const folder = normalizeFolderPath(targetFolder || '');
+            const current = normalizeFolderPath(entry.folder_path || '');
+            if (folder === current) return;
 
-        function updateSearchViewQuery(open) {
-            const params = new URLSearchParams(window.location.search);
-            if (open) {
-                params.set('view', 'search');
+            setStatus('移动词条中...');
+            const data = await requestJson(apiBase + entry.id + '/', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                },
+                body: JSON.stringify({ folder_path: folder }),
+            });
+
+            if (data && typeof data.folder_path === 'string') {
+                entry.folder_path = data.folder_path;
             } else {
-                params.delete('view');
+                entry.folder_path = folder;
             }
-            const query = params.toString();
-            const nextUrl = window.location.pathname + (query ? '?' + query : '') + window.location.hash;
-            window.history.replaceState({}, '', nextUrl);
+
+            if (folder && !state.customFolders.includes(folder)) {
+                state.customFolders.push(folder);
+                state.customFolders.sort((a, b) => a.localeCompare(b, 'zh-CN'));
+                persistCustomFolders();
+            }
+
+            renderFiltersAndList();
+            renderEditor();
+            setStatus('已移动到目录：' + (folder || '根目录'));
         }
 
         function setSearchCenterOpen(open) {
@@ -184,7 +530,6 @@
             if (el.searchCenter) {
                 el.searchCenter.hidden = !state.searchCenterOpen;
             }
-            updateSearchViewQuery(state.searchCenterOpen);
             if (state.searchCenterOpen && el.portalKeyword) {
                 el.portalKeyword.focus();
             }
@@ -398,6 +743,8 @@
                 state.draftProperties = [];
                 renderPropsRows();
                 el.backlinks.innerHTML = '<div class="text-muted">未选中词条</div>';
+                syncLinkTargets();
+                renderMarkdownPreview();
                 return;
             }
 
@@ -423,6 +770,9 @@
                     })
                     .join('');
             }
+
+                    syncLinkTargets();
+                    renderMarkdownPreview();
         }
 
         function renderFiltersAndList() {
@@ -546,6 +896,7 @@
             state.selectedId = null;
             renderFiltersAndList();
             renderEditor();
+            setContentMode('edit');
             setStatus('已进入新建模式');
         });
 
@@ -579,10 +930,83 @@
 
         if (el.folderTree) {
             el.folderTree.addEventListener('click', (event) => {
+                const toggle = event.target.closest('[data-toggle-folder]');
+                if (toggle) {
+                    const path = normalizeFolderPath(toggle.dataset.toggleFolder || '');
+                    if (path) {
+                        if (state.collapsedFolders.has(path)) {
+                            state.collapsedFolders.delete(path);
+                        } else {
+                            state.collapsedFolders.add(path);
+                        }
+                        persistCollapsedFolders();
+                        renderFolderTree();
+                    }
+                    return;
+                }
+
+                const entryNode = event.target.closest('[data-entry-id]');
+                if (entryNode) {
+                    state.selectedId = Number(entryNode.dataset.entryId);
+                    renderFiltersAndList();
+                    renderEditor();
+                    return;
+                }
+
                 const node = event.target.closest('[data-folder]');
                 if (!node) return;
                 state.activeFolder = normalizeFolderPath(node.dataset.folder || '');
                 renderFiltersAndList();
+            });
+
+            el.folderTree.addEventListener('dragstart', (event) => {
+                const node = event.target.closest('[data-entry-id]');
+                if (!node) return;
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/worldview-entry-id', node.dataset.entryId || '');
+                node.classList.add('dragging');
+            });
+
+            el.folderTree.addEventListener('dragend', (event) => {
+                const node = event.target.closest('[data-entry-id]');
+                if (!node) return;
+                node.classList.remove('dragging');
+                for (const item of el.folderTree.querySelectorAll('.is-drop-target')) {
+                    item.classList.remove('is-drop-target');
+                }
+            });
+
+            el.folderTree.addEventListener('dragover', (event) => {
+                const target = event.target.closest('[data-drop-folder]');
+                if (!target) return;
+                event.preventDefault();
+                for (const item of el.folderTree.querySelectorAll('.is-drop-target')) {
+                    item.classList.remove('is-drop-target');
+                }
+                target.classList.add('is-drop-target');
+            });
+
+            el.folderTree.addEventListener('dragleave', (event) => {
+                const target = event.target.closest('[data-drop-folder]');
+                if (!target) return;
+                target.classList.remove('is-drop-target');
+            });
+
+            el.folderTree.addEventListener('drop', async (event) => {
+                const target = event.target.closest('[data-drop-folder]');
+                if (!target) return;
+                event.preventDefault();
+                target.classList.remove('is-drop-target');
+
+                const entryId = event.dataTransfer.getData('text/worldview-entry-id');
+                if (!entryId) return;
+                const folder = normalizeFolderPath(target.dataset.dropFolder || '');
+
+                try {
+                    await moveEntryToFolder(Number(entryId), folder);
+                } catch (error) {
+                    setStatus(error.message || '拖拽移动失败', true);
+                }
             });
         }
 
@@ -638,10 +1062,97 @@
             try {
                 setStatus('保存中...');
                 await saveEntry();
+                await renderMarkdownPreview();
+                setContentMode('view');
             } catch (error) {
                 setStatus(error.message || '保存失败', true);
             }
         });
+
+        if (el.contentViewBtn) {
+            el.contentViewBtn.addEventListener('click', async () => {
+                setContentMode('view');
+                await renderMarkdownPreview();
+            });
+        }
+
+        if (el.contentEditBtn) {
+            el.contentEditBtn.addEventListener('click', () => {
+                setContentMode('edit');
+                el.content?.focus();
+            });
+        }
+
+        if (el.content) {
+            el.content.addEventListener('input', schedulePreview);
+        }
+
+        if (el.mdH1) {
+            el.mdH1.addEventListener('click', () => toggleLinePrefix('# '));
+        }
+        if (el.mdBold) {
+            el.mdBold.addEventListener('click', () => wrapSelection('**', '**', '加粗文本'));
+        }
+        if (el.mdItalic) {
+            el.mdItalic.addEventListener('click', () => wrapSelection('*', '*', '斜体文本'));
+        }
+        if (el.mdList) {
+            el.mdList.addEventListener('click', () => toggleLinePrefix('- '));
+        }
+        if (el.mdQuote) {
+            el.mdQuote.addEventListener('click', () => toggleLinePrefix('> '));
+        }
+        if (el.mdCode) {
+            el.mdCode.addEventListener('click', () => wrapSelection('```\n', '\n```', '代码片段'));
+        }
+
+        if (el.insertLink) {
+            el.insertLink.addEventListener('click', () => {
+                const name = (el.linkTarget?.value || '').trim();
+                if (!name) return;
+                insertAtCursor('[[' + name + ']]');
+            });
+        }
+
+        if (el.insertBacklink) {
+            el.insertBacklink.addEventListener('click', () => {
+                const name = (el.backlinkTarget?.value || '').trim();
+                if (!name) return;
+                insertAtCursor('[[' + name + ']]');
+            });
+        }
+
+        if (el.uploadImage && el.imageInput) {
+            el.uploadImage.addEventListener('click', () => {
+                el.imageInput.click();
+            });
+
+            el.imageInput.addEventListener('change', async () => {
+                const file = el.imageInput.files?.[0];
+                if (!file) return;
+                try {
+                    setStatus('上传图片中...');
+                    const formData = new FormData();
+                    formData.append('novel', String(workspaceId));
+                    formData.append('image', file);
+                    const data = await requestFormJson(uploadImageApi, formData, {
+                        headers: {
+                            'X-CSRFToken': csrftoken,
+                        },
+                    });
+                    if (data.url) {
+                        insertAtCursor('\n![' + file.name + '](' + data.url + ')\n');
+                        setStatus('图片已上传');
+                    } else {
+                        setStatus('图片上传成功，但未返回地址', true);
+                    }
+                } catch (error) {
+                    setStatus(error.message || '图片上传失败', true);
+                } finally {
+                    el.imageInput.value = '';
+                }
+            });
+        }
 
         el.del.addEventListener('click', async () => {
             try {
@@ -659,7 +1170,8 @@
         }
 
         if (el.closeSearch) {
-            el.closeSearch.addEventListener('click', () => {
+            el.closeSearch.addEventListener('click', (event) => {
+                event.preventDefault();
                 setSearchCenterOpen(false);
             });
         }
@@ -704,10 +1216,17 @@
             });
         }
 
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && state.searchCenterOpen) {
+                setSearchCenterOpen(false);
+            }
+        });
+
         try {
             setStatus('加载中...');
             await loadEntries();
-            setSearchCenterOpen(getSearchViewMode());
+            setSearchCenterOpen(false);
+            setContentMode('view');
             if (state.searchCenterOpen) {
                 runSearchCenter();
             }

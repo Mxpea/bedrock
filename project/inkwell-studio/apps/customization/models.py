@@ -114,11 +114,17 @@ class AuthorHomepageConfig(TimeStampedModel):
     author = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="homepage_config")
     template_choice = models.CharField(max_length=24, choices=TemplateChoice.choices, default=TemplateChoice.MINIMAL)
     header_image_url = models.URLField(blank=True)
+    header_image = models.ImageField(upload_to='author_headers/', blank=True, null=True)
     avatar_url = models.URLField(blank=True)
+    avatar = models.ImageField(upload_to='author_avatars/', blank=True, null=True)
+    author_bio = models.TextField(blank=True, default="")
     custom_html = models.TextField(blank=True)
     custom_css = models.TextField(blank=True)
     use_custom_page = models.BooleanField(default=False)
     sandbox_mode = models.CharField(max_length=64, default="allow-scripts allow-same-origin")
+    page_schema_draft = models.JSONField(default=dict, blank=True)
+    page_schema_published = models.JSONField(default=dict, blank=True)
+    global_style = models.JSONField(default=dict, blank=True)
 
 
 class CustomFont(TimeStampedModel):

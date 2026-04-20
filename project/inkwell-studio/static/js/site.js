@@ -52,6 +52,17 @@ function getAccessToken() {
     return localStorage.getItem("bedrock_access");
 }
 
+function getCookie(name) {
+    const cookies = document.cookie ? document.cookie.split(";") : [];
+    for (const raw of cookies) {
+        const cookie = raw.trim();
+        if (cookie.startsWith(name + "=")) {
+            return decodeURIComponent(cookie.slice(name.length + 1));
+        }
+    }
+    return "";
+}
+
 async function refreshAccessToken() {
     const refresh = localStorage.getItem("bedrock_refresh");
     if (!refresh) {
@@ -85,9 +96,17 @@ async function refreshAccessToken() {
 }
 
 async function fetchWithAuthRetry(url, init = {}) {
-    const baseHeaders = init.headers || {};
+    const baseHeaders = init.headers instanceof Headers
+        ? Object.fromEntries(init.headers.entries())
+        : (init.headers || {});
+    const method = String(init.method || "GET").toUpperCase();
     const token = getAccessToken();
-    const firstHeaders = token ? {...baseHeaders, Authorization: `Bearer ${token}`} : baseHeaders;
+    const csrfToken = getCookie("csrftoken");
+    const unsafeMethod = !["GET", "HEAD", "OPTIONS", "TRACE"].includes(method);
+    const csrfHeaders = unsafeMethod && csrfToken ? {"X-CSRFToken": csrfToken} : {};
+    const firstHeaders = token
+        ? {...baseHeaders, ...csrfHeaders, Authorization: `Bearer ${token}`}
+        : {...baseHeaders, ...csrfHeaders};
 
     let response = await fetch(url, {...init, headers: firstHeaders});
     if (response.status !== 401) {
@@ -102,7 +121,7 @@ async function fetchWithAuthRetry(url, init = {}) {
         return response;
     }
 
-    const retryHeaders = {...baseHeaders, Authorization: `Bearer ${newAccess}`};
+    const retryHeaders = {...baseHeaders, ...csrfHeaders, Authorization: `Bearer ${newAccess}`};
     response = await fetch(url, {...init, headers: retryHeaders});
     return response;
 }
