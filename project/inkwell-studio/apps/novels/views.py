@@ -1,10 +1,12 @@
 import os
 import uuid
+import re
 from io import BytesIO
 
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.utils.text import slugify
+from django.utils.html import strip_tags
 from PIL import Image, ImageOps
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -12,12 +14,13 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from django.db.models import Q
+from django.db.models import Max
 
 from apps.customization.markdown_extensions import sanitize_advanced_content, sanitize_standard_content
 from apps.customization.models import AdvancedStyleGrant
-from .models import Chapter, Novel, Character
+from .models import Chapter, Novel, Character, WorldviewEntry, WorldviewLink
 from .permissions import CanReadNovel, IsAuthorOrReadOnly
-from .serializers import ChapterSerializer, NovelSerializer, CharacterSerializer
+from .serializers import ChapterSerializer, NovelSerializer, CharacterSerializer, WorldviewEntrySerializer
 
 
 class NovelViewSet(viewsets.ModelViewSet):
@@ -128,7 +131,11 @@ class ChapterViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("只能向自己的作品新增章节")
         if novel.is_locked:
             raise PermissionDenied("工作区已被锁定，暂不可新增章节")
-        chapter = serializer.save()
+        if "order" not in serializer.initial_data:
+            next_order = (Chapter.objects.filter(novel=novel).aggregate(max_order=Max("order"))["max_order"] or 0) + 1
+            chapter = serializer.save(order=next_order)
+        else:
+            chapter = serializer.save()
         novel.last_open_module = Novel.Module.WRITING
         novel.last_open_chapter_id = chapter.id
         novel.save(update_fields=["last_open_module", "last_open_chapter_id", "updated_at"])
@@ -337,3 +344,137 @@ class CharacterViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(character)
         return Response({"avatar_url": serializer.data.get("avatar_url", "")}, status=status.HTTP_200_OK)
+
+
+class WorldviewEntryViewSet(viewsets.ModelViewSet):
+    serializer_class = WorldviewEntrySerializer
+    permission_classes = [permissions.IsAuthenticated]
+    ordering_fields = ["name", "created_at", "updated_at"]
+
+    def get_queryset(self):
+        queryset = WorldviewEntry.objects.select_related("novel").filter(
+            novel__author=self.request.user,
+            novel__is_deleted=False,
+        )
+
+        novel_id = (self.request.GET.get("novel") or "").strip()
+        if novel_id:
+            queryset = queryset.filter(novel_id=novel_id)
+
+        keyword = (self.request.GET.get("q") or "").strip()
+        if keyword:
+            queryset = queryset.filter(
+                Q(name__icontains=keyword)
+                | Q(content_md__icontains=keyword)
+                | Q(plain_content__icontains=keyword)
+                | Q(aliases__icontains=keyword)
+            )
+
+        category = (self.request.GET.get("category") or "").strip()
+        if category:
+            queryset = queryset.filter(category=category)
+
+        folder = (self.request.GET.get("folder") or "").strip().strip("/")
+        if folder:
+            queryset = queryset.filter(Q(folder_path=folder) | Q(folder_path__startswith=folder + "/"))
+
+        tags = [item.strip() for item in (self.request.GET.get("tags") or "").split(",") if item.strip()]
+        for tag in tags:
+            queryset = queryset.filter(tags__contains=[tag])
+
+        return queryset.order_by("name", "id")
+
+    def perform_create(self, serializer):
+        novel = serializer.validated_data["novel"]
+        if novel.is_locked:
+            raise PermissionDenied("工作区已被锁定，暂不可新建世界观词条")
+        instance = serializer.save()
+        self._refresh_entry_fields(instance)
+        self._refresh_links(instance)
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        if instance.novel.is_locked:
+            raise PermissionDenied("工作区已被锁定，暂不可编辑世界观词条")
+        instance = serializer.save()
+        self._refresh_entry_fields(instance)
+        self._refresh_links(instance)
+
+    def perform_destroy(self, instance):
+        if instance.novel.is_locked:
+            raise PermissionDenied("工作区已被锁定，暂不可删除世界观词条")
+        WorldviewLink.objects.filter(Q(source=instance) | Q(target=instance)).delete()
+        instance.delete()
+
+    @action(detail=False, methods=["get"], permission_classes=[permissions.IsAuthenticated])
+    def facets(self, request):
+        queryset = self.get_queryset()
+
+        category_counts = {}
+        for item in queryset.values("category"):
+            name = (item.get("category") or "未分类").strip() or "未分类"
+            category_counts[name] = category_counts.get(name, 0) + 1
+
+        tag_counts = {}
+        for item in queryset.values("tags"):
+            for tag in (item.get("tags") or []):
+                text = str(tag).strip()
+                if text:
+                    tag_counts[text] = tag_counts.get(text, 0) + 1
+
+        return Response(
+            {
+                "categories": [{"name": name, "count": count} for name, count in sorted(category_counts.items())],
+                "tags": [{"name": name, "count": count} for name, count in sorted(tag_counts.items())],
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def _refresh_entry_fields(self, entry):
+        html = sanitize_standard_content(entry.content_md or "")
+        plain = strip_tags(html)
+        WorldviewEntry.objects.filter(pk=entry.pk).update(content_html=html, plain_content=plain)
+        entry.content_html = html
+        entry.plain_content = plain
+
+    def _refresh_links(self, entry):
+        pattern = re.compile(r"\[\[([^\]]+)\]\]")
+        text = entry.content_md or ""
+        names = [name.strip() for name in pattern.findall(text) if name.strip()]
+
+        WorldviewLink.objects.filter(source=entry).delete()
+
+        if not names:
+            return
+
+        targets = {
+            item.name: item
+            for item in WorldviewEntry.objects.filter(
+                novel_id=entry.novel_id,
+                name__in=list(set(names)),
+            ).exclude(pk=entry.pk)
+        }
+
+        created = []
+        for match in pattern.finditer(text):
+            raw_name = match.group(1).strip()
+            target = targets.get(raw_name)
+            if not target:
+                continue
+            start = max(match.start() - 24, 0)
+            end = min(match.end() + 24, len(text))
+            context = text[start:end].replace("\n", " ").strip()
+            created.append(
+                WorldviewLink(
+                    novel_id=entry.novel_id,
+                    source_id=entry.id,
+                    target_id=target.id,
+                    context=context[:255],
+                )
+            )
+
+        if created:
+            dedup = {}
+            for item in created:
+                dedup[(item.source_id, item.target_id)] = item
+            WorldviewLink.objects.bulk_create(list(dedup.values()), ignore_conflicts=True)

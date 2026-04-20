@@ -432,15 +432,25 @@ body.dark-mode .reader-controls .icon-btn:hover { background: rgba(255,255,255,0
     width: 100%;
     max-width: 800px;
     padding: 64px 24px 120px;
-    font-family: "Georgia", "Palatino Linotype", "ChaoTu", "PingFang SC", "Microsoft YaHei", serif;
+    font-family: var(--reader-theme-font, "Noto Serif SC", "PingFang SC", "Microsoft YaHei", serif);
     font-size: 1.35rem; /* Reader default */
     line-height: 2.1;
     letter-spacing: 0.02em;
 }
 
+.reader-content a,
+.chapter-html a {
+    color: var(--r-accent);
+}
+
+.chapter-html p,
 .reader-content p {
-    margin-bottom: var(--r-paragraph-spacing);
+    margin: 0 0 var(--r-paragraph-spacing);
     text-indent: 0;
+}
+
+.chapter-html p:last-child {
+    margin-bottom: 0;
 }
 
 /* Custom Markdown tags styling */

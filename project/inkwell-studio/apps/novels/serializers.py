@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Chapter, Novel, Character
+from .models import Chapter, Novel, Character, WorldviewEntry
 
 
 class NovelSerializer(serializers.ModelSerializer):
@@ -30,6 +30,7 @@ class NovelSerializer(serializers.ModelSerializer):
             "last_open_module",
             "last_open_chapter_id",
             "outline_canvas",
+            "worldbuilding_data",
             "is_deleted",
             "author",
             "author_username",
@@ -145,3 +146,87 @@ class CharacterSerializer(serializers.ModelSerializer):
         instance.chapter_mentions = mentions
         instance.save(update_fields=["chapter_mentions", "updated_at"])
         return instance
+
+
+class WorldviewEntrySerializer(serializers.ModelSerializer):
+    incoming_links = serializers.SerializerMethodField()
+    outgoing_links = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorldviewEntry
+        fields = [
+            "id",
+            "novel",
+            "name",
+            "folder_path",
+            "aliases",
+            "category",
+            "tags",
+            "properties",
+            "content_md",
+            "content_html",
+            "plain_content",
+            "incoming_links",
+            "outgoing_links",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["content_html", "plain_content", "incoming_links", "outgoing_links"]
+
+    def get_incoming_links(self, obj):
+        return [
+            {
+                "id": link.source_id,
+                "name": link.source.name,
+                "context": link.context,
+            }
+            for link in obj.incoming_links.select_related("source").all()[:20]
+        ]
+
+    def get_outgoing_links(self, obj):
+        return [
+            {
+                "id": link.target_id,
+                "name": link.target.name,
+                "context": link.context,
+            }
+            for link in obj.outgoing_links.select_related("target").all()[:20]
+        ]
+
+    def validate_aliases(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("别名必须为数组")
+        cleaned = []
+        for item in value:
+            text = str(item).strip()
+            if text and text not in cleaned:
+                cleaned.append(text)
+        return cleaned
+
+    def validate_folder_path(self, value):
+        text = str(value or "").strip().strip("/")
+        text = "/".join([part.strip() for part in text.split("/") if part.strip()])
+        if len(text) > 255:
+            raise serializers.ValidationError("目录路径长度不能超过255")
+        return text
+
+    def validate_tags(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("标签必须为数组")
+        cleaned = []
+        for item in value:
+            text = str(item).strip()
+            if text and text not in cleaned:
+                cleaned.append(text)
+        return cleaned
+
+    def validate_properties(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("属性必须为对象")
+        return value
+
+    def validate_novel(self, novel):
+        request = self.context.get("request")
+        if not request or novel.author != request.user:
+            raise serializers.ValidationError("只能操作自己的工作区世界观词条")
+        return novel

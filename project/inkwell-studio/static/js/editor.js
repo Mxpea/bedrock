@@ -695,6 +695,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const getNextChapterOrder = async (novelId, token) => {
+        if (!novelId || !token) return 1;
+        try {
+            const response = await fetch(`/api/chapters/?novel=${novelId}&ordering=order`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!response.ok) return 1;
+            const payload = await response.json();
+            const chapters = Array.isArray(payload) ? payload : (payload.results || []);
+            const maxOrder = chapters.reduce((max, item) => Math.max(max, Number(item.order) || 0), 0);
+            return maxOrder + 1;
+        } catch {
+            return 1;
+        }
+    };
+
     document.getElementById('btn-new-chapter')?.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -782,6 +798,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const url = currentChapterId ? `/api/chapters/${currentChapterId}/` : '/api/chapters/';
             const method = currentChapterId ? 'PUT' : 'POST';
+            if (!currentChapterId) {
+                payload.order = await getNextChapterOrder(currentNovelId, token);
+            }
             
             const res = await fetch(url, {
                 method,
@@ -801,6 +820,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const now = new Date();
                 saveStatus.textContent = `已自动保存 ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
                 if (breadcrumb) breadcrumb.textContent = `工作区 ${data.workspace_name || '#' + data.novel} / ${data.title}`;
+                await loadChapterList(currentNovelId);
             } else {
                 saveStatus.textContent = '保存失败';
             }

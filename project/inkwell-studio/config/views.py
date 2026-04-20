@@ -84,6 +84,19 @@ class WorkspacePageView(LoginRequiredMixin, TemplateView):
                 }
             )
 
+        if module == Novel.Module.WORLDBUILDING:
+            context.update(
+                {
+                    "worldbuilding_data": workspace.worldbuilding_data or {},
+                    "world_chapter_refs": list(
+                        chapters.values("id", "title", "order")
+                    ),
+                    "world_character_refs": list(
+                        workspace.characters.order_by("name", "id").values("id", "name")
+                    ),
+                }
+            )
+
         return context
 
 

@@ -1,0 +1,531 @@
+<section class="workspace-panel worldview-panel-v2">
+    <div class="worldview-v2" id="worldview-v2-app" data-api-base="/api/worldview-entries/" data-workspace-id="{{ workspace.id }}">
+        <aside class="worldview-v2-sidebar">
+            <div class="worldview-v2-toolbar">
+                <input id="wv-search" type="search" placeholder="搜索词条 / 别名 / 正文...">
+                <div class="worldview-v2-toolbar-actions">
+                    <button id="wv-create" type="button" class="button primary">+ 新建词条</button>
+                    <button id="wv-open-search" type="button" class="button secondary">强检索中心</button>
+                </div>
+            </div>
+
+            <div class="worldview-v2-filters">
+                <div class="worldview-v2-folders-head">
+                    <h4>文档目录</h4>
+                    <button id="wv-create-folder" type="button" class="button secondary">+ 新建文件夹</button>
+                </div>
+                <div id="wv-folder-tree" class="worldview-v2-folder-tree"></div>
+
+                <h4>分类</h4>
+                <div id="wv-categories" class="worldview-v2-chip-list"></div>
+
+                <h4>标签</h4>
+                <div id="wv-tags" class="worldview-v2-chip-list"></div>
+            </div>
+
+            <div class="worldview-v2-results-wrap">
+                <div class="worldview-v2-results-head">
+                    <strong>词条列表</strong>
+                    <span id="wv-count" class="text-muted">0</span>
+                </div>
+                <div id="wv-results" class="worldview-v2-results"></div>
+            </div>
+        </aside>
+
+        <main class="worldview-v2-editor">
+            <header class="worldview-v2-editor-head">
+                <input id="wv-name" type="text" placeholder="词条名，例如：永夜城">
+                <div class="worldview-v2-editor-actions">
+                    <button id="wv-delete" type="button" class="button secondary">删除</button>
+                    <button id="wv-save" type="button" class="button primary">保存</button>
+                </div>
+            </header>
+
+            <section class="worldview-v2-meta-grid">
+                <label>
+                    <span>分类</span>
+                    <input id="wv-category" type="text" placeholder="地点 / 人物 / 规则...">
+                </label>
+                <label>
+                    <span>别名（逗号分隔）</span>
+                    <input id="wv-aliases" type="text" placeholder="夜都, The Dark City">
+                </label>
+                <label>
+                    <span>所属目录</span>
+                    <input id="wv-folder-path" type="text" placeholder="如：地点/王都/核心区">
+                </label>
+                <label class="worldview-v2-meta-full">
+                    <span>标签（逗号分隔）</span>
+                    <input id="wv-tags-input" type="text" placeholder="极寒地带, 上古遗迹">
+                </label>
+            </section>
+
+            <section class="worldview-v2-props">
+                <div class="worldview-v2-props-head">
+                    <h3>属性（Properties）</h3>
+                    <button id="wv-add-prop" type="button" class="button secondary">+ 添加属性</button>
+                </div>
+                <div id="wv-props" class="worldview-v2-props-list"></div>
+            </section>
+
+            <section class="worldview-v2-content">
+                <h3>正文（Markdown）</h3>
+                <textarea id="wv-content" rows="16" placeholder="支持 [[词条名]] 语法建立双向链接"></textarea>
+            </section>
+
+            <section class="worldview-v2-backlinks">
+                <h3>反向链接（Backlinks）</h3>
+                <div id="wv-backlinks" class="worldview-v2-backlinks-list"></div>
+            </section>
+
+            <div id="wv-status" class="text-muted"></div>
+        </main>
+
+        <section id="wv-search-center" class="wv-search-center" hidden>
+            <div class="wv-search-center-head">
+                <h2>强检索中心</h2>
+                <button id="wv-close-search" type="button" class="button secondary">返回编辑器</button>
+            </div>
+
+            <div class="wv-search-grid">
+                <label>
+                    <span>关键词</span>
+                    <input id="wv-portal-keyword" type="search" placeholder="支持词条名、别名、正文、属性词检索">
+                </label>
+                <label>
+                    <span>分类</span>
+                    <input id="wv-portal-category" type="text" placeholder="如：地点">
+                </label>
+                <label>
+                    <span>标签（逗号分隔）</span>
+                    <input id="wv-portal-tags" type="text" placeholder="如：极寒地带, 上古遗迹">
+                </label>
+                <label>
+                    <span>排序</span>
+                    <select id="wv-portal-sort">
+                        <option value="score">相关度优先</option>
+                        <option value="updated">最近更新</option>
+                        <option value="name">名称排序</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="wv-search-actions">
+                <button id="wv-portal-run" type="button" class="button primary">开始检索</button>
+                <button id="wv-portal-clear" type="button" class="button secondary">清空条件</button>
+                <span id="wv-portal-count" class="text-muted">0 条结果</span>
+            </div>
+
+            <div id="wv-portal-results" class="wv-search-results"></div>
+        </section>
+    </div>
+</section>
+
+<style>
+.worldview-panel-v2 {
+    border: none;
+    padding: 0;
+    background: transparent;
+    height: 100%;
+}
+
+.worldview-v2,
+.worldview-v2 * {
+    box-sizing: border-box;
+}
+
+.worldview-v2 {
+    height: 100%;
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
+    background: linear-gradient(180deg, #fefefe 0%, #f8fbff 100%);
+    position: relative;
+}
+
+.worldview-v2-sidebar {
+    border-right: 1px solid var(--line);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    background: linear-gradient(180deg, #f7fafc 0%, #f1f5f9 100%);
+    overflow-y: auto;
+}
+
+.worldview-v2-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.worldview-v2-toolbar input {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: #fff;
+    outline: none;
+}
+
+.worldview-v2-toolbar input:focus,
+.worldview-v2-meta-grid input:focus,
+.worldview-v2-content textarea:focus,
+.worldview-v2-prop-row input:focus,
+.wv-search-grid input:focus,
+.wv-search-grid select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.worldview-v2-toolbar-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.worldview-v2-filters h4 {
+    margin: 0 0 8px;
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.worldview-v2-folders-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.worldview-v2-folders-head h4 {
+    margin: 0;
+}
+
+.worldview-v2-folder-tree {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    max-height: 220px;
+    overflow: auto;
+    padding: 8px;
+    margin-bottom: 14px;
+    display: grid;
+    gap: 4px;
+}
+
+.worldview-v2-folder-node {
+    border: none;
+    background: transparent;
+    text-align: left;
+    border-radius: 8px;
+    padding: 6px 8px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.83rem;
+}
+
+.worldview-v2-folder-node:hover {
+    background: color-mix(in srgb, var(--accent) 8%, #fff);
+}
+
+.worldview-v2-folder-node.active {
+    background: color-mix(in srgb, var(--accent) 12%, #fff);
+    color: var(--accent-strong);
+    font-weight: 600;
+}
+
+.worldview-v2-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.worldview-v2-chip {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    background: #fff;
+    cursor: pointer;
+}
+
+.worldview-v2-chip.active {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, #fff);
+    color: var(--accent-strong);
+}
+
+.worldview-v2-results-wrap {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+}
+
+.worldview-v2-results-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.worldview-v2-results {
+    overflow: auto;
+    display: grid;
+    gap: 8px;
+    padding-right: 4px;
+}
+
+.worldview-v2-item {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
+    background: #fff;
+    cursor: pointer;
+    text-align: left;
+}
+
+.worldview-v2-item.active {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, #fff);
+}
+
+.worldview-v2-item .name {
+    font-weight: 600;
+}
+
+.worldview-v2-item .meta {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 4px;
+}
+
+.worldview-v2-editor {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.worldview-v2-editor-head {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+}
+
+.worldview-v2-editor-head #wv-name {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.worldview-v2-editor-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.worldview-v2-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.worldview-v2-meta-grid label,
+.wv-search-grid label {
+    display: grid;
+    gap: 6px;
+}
+
+.worldview-v2-meta-grid input,
+.worldview-v2-prop-row input,
+.wv-search-grid input,
+.wv-search-grid select {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 9px 10px;
+    background: #fff;
+    outline: none;
+}
+
+.worldview-v2-meta-full {
+    grid-column: 1 / -1;
+}
+
+.worldview-v2-props {
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 16px 0;
+}
+
+.worldview-v2-props-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.worldview-v2-props-list {
+    display: grid;
+    gap: 8px;
+}
+
+.worldview-v2-prop-row {
+    display: grid;
+    grid-template-columns: 160px minmax(0, 1fr) auto;
+    gap: 8px;
+}
+
+.worldview-v2-content textarea {
+    width: 100%;
+    min-height: 280px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px;
+    font: inherit;
+    line-height: 1.65;
+    background: #fff;
+    outline: none;
+    resize: vertical;
+}
+
+.worldview-v2-backlinks-list {
+    display: grid;
+    gap: 8px;
+}
+
+.worldview-v2-backlink {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    padding: 10px;
+}
+
+.worldview-v2-backlink .from {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--accent-strong);
+}
+
+.wv-search-center {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, #ffffff 92%, var(--bg-soft));
+    backdrop-filter: blur(6px);
+    z-index: 4;
+    padding: 26px 28px;
+    display: grid;
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    gap: 14px;
+}
+
+.wv-search-center-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.wv-search-center-head h2 {
+    margin: 0;
+}
+
+.wv-search-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.wv-search-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.wv-search-results {
+    overflow: auto;
+    display: grid;
+    gap: 10px;
+    padding-right: 4px;
+}
+
+.wv-search-card {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    padding: 12px;
+    display: grid;
+    gap: 8px;
+}
+
+.wv-search-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.wv-search-card h4 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.wv-search-meta {
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.wv-search-snippet {
+    margin: 0;
+    color: var(--text);
+    line-height: 1.5;
+}
+
+.wv-search-score {
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    padding: 2px 8px;
+    font-size: 0.78rem;
+    color: var(--accent-strong);
+    background: color-mix(in srgb, var(--accent) 10%, #fff);
+}
+
+@media (max-width: 1240px) {
+    .wv-search-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 980px) {
+    .worldview-v2 {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .worldview-v2-sidebar {
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+        max-height: 46vh;
+    }
+
+    .worldview-v2-editor,
+    .wv-search-center {
+        padding: 16px;
+    }
+
+    .worldview-v2-meta-grid,
+    .wv-search-grid,
+    .worldview-v2-prop-row {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script src="/static/js/worldview-wiki.js"></script>

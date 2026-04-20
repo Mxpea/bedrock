@@ -5,7 +5,7 @@
 
 {% block content %}
 <div data-workspace-context data-workspace-id="{{ workspace.id }}" data-workspace-title="{{ workspace.title }}" data-workspace-icon-url="{% if workspace.icon %}{{ workspace.icon.url }}{% endif %}" data-workspace-module="{{ module }}" data-workspace-chapter-id="{% if active_chapter %}{{ active_chapter.id }}{% endif %}"></div>
-<section id="workspace-shell" class="workspace-shell {% if module == 'writing' %}workspace-shell-writing{% endif %} {% if module == 'outline' %}workspace-shell-outline{% endif %}">
+<section id="workspace-shell" class="workspace-shell {% if module == 'writing' %}workspace-shell-writing{% endif %} {% if module == 'outline' %}workspace-shell-outline{% endif %} {% if module == 'worldbuilding' %}workspace-shell-worldbuilding{% endif %}">
     <aside id="workspace-sidebar" class="workspace-sidebar">
         <div class="workspace-sidebar-head">
             <div id="workspace-sidebar-icon" class="workspace-sidebar-icon">
@@ -44,7 +44,7 @@
         </div>
     </aside>
 
-    <main class="workspace-content {% if module == 'writing' %}workspace-content-writing{% endif %} {% if module == 'outline' %}workspace-content-outline{% endif %}">
+    <main class="workspace-content {% if module == 'writing' %}workspace-content-writing{% endif %} {% if module == 'outline' %}workspace-content-outline{% endif %} {% if module == 'worldbuilding' %}workspace-content-worldbuilding{% endif %}">
         {% if module != 'writing' %}
         <div class="workspace-breadcrumb">工作区：{{ workspace.title }} / {{ module_label }}</div>
         {% endif %}
@@ -373,10 +373,7 @@
             </div>
         </section>
         {% elif module == 'worldbuilding' %}
-        <section class="workspace-panel">
-            <h1>世界观</h1>
-            <p class="lead">已切换为工作区内世界观模块。后续可以扩展结构化 Wiki 与引用追踪。</p>
-        </section>
+        {% include 'workspace/modules/worldbuilding.html' %}
         {% elif module == 'appearance' %}
         <section class="workspace-panel">
             <h1>外观定制</h1>
@@ -727,6 +724,10 @@ document.addEventListener('DOMContentLoaded', () => {
 {% if module == 'outline' %}
 {{ outline_canvas|json_script:"outline-initial-data" }}
 <script src="{% static 'js/outline.js' %}"></script>
+{% endif %}
+
+{% if module == 'worldbuilding' %}
+<script src="{% static 'js/worldview-wiki.js' %}"></script>
 {% endif %}
 
 {% if module == 'characters' %}

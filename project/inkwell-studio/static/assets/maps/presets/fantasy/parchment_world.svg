@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2400 1600">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f1e2bc"/>
+      <stop offset="1" stop-color="#e7d4a2"/>
+    </linearGradient>
+    <filter id="grain" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0.15"/>
+      <feBlend mode="multiply" in2="SourceGraphic"/>
+    </filter>
+  </defs>
+  <rect width="2400" height="1600" fill="url(#bg)"/>
+  <g fill="#c2a77a" opacity="0.45">
+    <path d="M260 380c240-180 460-220 670-110 140 72 248 70 360-28 180-156 390-170 650-44v708c-340 110-622 74-840-102-156-126-288-136-472-36-160 86-305 126-368 94V380z"/>
+    <path d="M1480 220c170-58 324-40 446 70 122 110 156 220 94 352-56 118-164 190-314 214-178 28-318-18-404-138-88-124-88-264 0-406 40-64 100-106 178-92z"/>
+  </g>
+  <g stroke="#7a5d33" stroke-width="8" fill="none" opacity="0.48">
+    <path d="M360 1220c260-120 468-116 646 36"/>
+    <path d="M980 1030c180-134 320-148 480-32"/>
+    <path d="M1490 850c200-58 350-30 470 84"/>
+  </g>
+  <rect width="2400" height="1600" filter="url(#grain)" opacity="0.06"/>
+</svg>

@@ -1,0 +1,27 @@
+{
+  "version": "1.0",
+  "presets": [
+    {
+      "id": "preset-fantasy-parchment",
+      "name": "羊皮纸大陆",
+      "category": "fantasy",
+      "url": "/static/assets/maps/presets/fantasy/parchment_world.svg",
+      "thumbnail": "/static/assets/maps/presets/fantasy/parchment_world.svg",
+      "width": 2400,
+      "height": 1600,
+      "default_zoom": 1,
+      "attribution": "Bedrock Preset"
+    },
+    {
+      "id": "preset-fantasy-nightsea",
+      "name": "夜海群岛",
+      "category": "fantasy",
+      "url": "/static/assets/maps/presets/fantasy/night_sea.svg",
+      "thumbnail": "/static/assets/maps/presets/fantasy/night_sea.svg",
+      "width": 2400,
+      "height": 1600,
+      "default_zoom": 1,
+      "attribution": "Bedrock Preset"
+    }
+  ]
+}

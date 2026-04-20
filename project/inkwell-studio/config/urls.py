@@ -14,13 +14,14 @@ from config.views import (
     RegisterPageView,
     WorkspacePageView,
 )
-from apps.novels.views import ChapterViewSet, NovelViewSet, CharacterViewSet
+from apps.novels.views import ChapterViewSet, NovelViewSet, CharacterViewSet, WorldviewEntryViewSet
 
 router = DefaultRouter()
 router.register(r"novels", NovelViewSet, basename="novel")
 router.register(r"workspaces", NovelViewSet, basename="workspace")
 router.register(r"chapters", ChapterViewSet, basename="chapter")
 router.register(r"characters", CharacterViewSet, basename="character")
+router.register(r"worldview-entries", WorldviewEntryViewSet, basename="worldview-entry")
 
 urlpatterns = [
     path("", HomePageView.as_view(), name="home"),

@@ -30,6 +30,7 @@ class Novel(TimeStampedModel):
     last_open_module = models.CharField(max_length=24, choices=Module.choices, default=Module.WRITING)
     last_open_chapter_id = models.PositiveIntegerField(null=True, blank=True)
     outline_canvas = models.JSONField(default=dict, blank=True)
+    worldbuilding_data = models.JSONField(default=dict, blank=True)
     is_deleted = models.BooleanField(default=False)
 
     class Meta:
@@ -138,3 +139,32 @@ class Character(TimeStampedModel):
                 )
 
         return hits
+
+class WorldviewEntry(TimeStampedModel):
+    novel = models.ForeignKey(Novel, on_delete=models.CASCADE, related_name="worldview_entries")
+    name = models.CharField(max_length=120)
+    aliases = models.JSONField(default=list, blank=True)
+    category = models.CharField(max_length=50, blank=True, db_index=True)
+    properties = models.JSONField(default=dict, blank=True)
+    content_md = models.TextField(blank=True)
+    content_html = models.TextField(blank=True)
+    tags = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        unique_together = ("novel", "name")
+
+    def __str__(self) -> str:
+        return f"{self.novel.title} - [Worldview] {self.name}"
+
+class WorldviewLink(TimeStampedModel):
+    novel = models.ForeignKey(Novel, on_delete=models.CASCADE, related_name="worldview_links")
+    source = models.ForeignKey(WorldviewEntry, on_delete=models.CASCADE, related_name="outgoing_links")
+    target = models.ForeignKey(WorldviewEntry, on_delete=models.CASCADE, related_name="incoming_links")
+    context = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        unique_together = ("source", "target")
+
+    def __str__(self) -> str:
+        return f"{self.source.name} -> {self.target.name}"

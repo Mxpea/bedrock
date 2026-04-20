@@ -90,6 +90,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let clipboardNode = null;
     let activeAnchorPositions = [];
 
+    const ANCHOR_ORDER_MIN = 0;
+    const ANCHOR_ORDER_MAX = 100;
+
     const history = [];
     const future = [];
     const nodeColorPresets = [
@@ -346,33 +349,22 @@ document.addEventListener("DOMContentLoaded", () => {
         return [...timeline.anchors].sort((a, b) => a.order - b.order);
     }
 
-    function getTimelineTrackWorldBounds() {
-        const leftWorld = 72;
-        const rightWorld = Math.max(leftWorld + 40, canvasEl.clientWidth - 72);
-        return { leftWorld, rightWorld };
+    function getAnchorOrderScale() {
+        const originWorld = 72;
+        const baseSpan = Math.max(120, canvasEl.clientWidth - 144);
+        const unitWorld = baseSpan / Math.max(1, ANCHOR_ORDER_MAX - ANCHOR_ORDER_MIN);
+        return { originWorld, unitWorld };
     }
 
     function anchorWorldPositionsByTimelineId(timelineId) {
         const anchors = getSortedAnchorsByTimelineId(timelineId);
         if (!anchors.length) return [];
 
-        const { leftWorld, rightWorld } = getTimelineTrackWorldBounds();
-        const worldSpan = Math.max(1, rightWorld - leftWorld);
-
-        if (anchors.length === 1) {
-            const ratio = clamp((Number(anchors[0].order) || 0) / 100, 0, 1);
-            return [{ ...anchors[0], worldX: leftWorld + worldSpan * ratio }];
-        }
-
-        const orders = anchors.map((item) => Number(item.order) || 0);
-        const minOrder = Math.min(...orders);
-        const maxOrder = Math.max(...orders);
-        const orderSpan = maxOrder - minOrder || 1;
-
-        return anchors.map((anchor, idx) => {
-            const order = Number(anchor.order) || 0;
-            const ratio = orderSpan === 0 ? (idx / Math.max(anchors.length - 1, 1)) : (order - minOrder) / orderSpan;
-            return { ...anchor, worldX: leftWorld + worldSpan * ratio };
+        const { originWorld, unitWorld } = getAnchorOrderScale();
+        return anchors.map((anchor) => {
+            const order = Number(anchor.order);
+            const normalized = Number.isFinite(order) ? (order - ANCHOR_ORDER_MIN) : 0;
+            return { ...anchor, worldX: originWorld + normalized * unitWorld };
         });
     }
 
@@ -1178,14 +1170,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const rect = canvasEl.getBoundingClientRect();
             const localX = clientX - rect.left;
             const world = screenToWorld(localX, 0);
-            const { leftWorld, rightWorld } = getTimelineTrackWorldBounds();
-            const ratio = clamp((world.x - leftWorld) / Math.max(rightWorld - leftWorld, 1), 0, 1);
-
-            const anchors = getSortedAnchors();
-            const orders = anchors.map((item) => item.order);
-            const minOrder = Math.min(...orders, 0);
-            const maxOrder = Math.max(...orders, 100 * Math.max(anchors.length, 1));
-            anchor.order = Math.round(minOrder + ratio * Math.max(maxOrder - minOrder, 1));
+            const { originWorld, unitWorld } = getAnchorOrderScale();
+            const order = ANCHOR_ORDER_MIN + ((world.x - originWorld) / Math.max(unitWorld, 0.001));
+            anchor.order = Number(order.toFixed(2));
 
             renderAll();
         }
@@ -1209,13 +1196,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const rect = canvasEl.getBoundingClientRect();
         const localX = clientX - rect.left;
         const world = screenToWorld(localX, 0);
-        const { leftWorld, rightWorld } = getTimelineTrackWorldBounds();
-        const ratio = clamp((world.x - leftWorld) / Math.max(rightWorld - leftWorld, 1), 0, 1);
-
-        const existingOrders = timeline.anchors.map((item) => item.order);
-        const minOrder = existingOrders.length ? Math.min(...existingOrders) : 0;
-        const maxOrder = existingOrders.length ? Math.max(...existingOrders) : 100;
-        const order = Math.round(minOrder + ratio * Math.max(maxOrder - minOrder || 100, 100));
+        const { originWorld, unitWorld } = getAnchorOrderScale();
+        const order = Number((ANCHOR_ORDER_MIN + ((world.x - originWorld) / Math.max(unitWorld, 0.001))).toFixed(2));
 
         const label = window.prompt("请输入时间锚点名称", `时间点 ${timeline.anchors.length + 1}`);
         if (!label) return;
@@ -1294,18 +1276,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function estimateAnchorOrderFromWorldX(timelineId, worldCenterX) {
-        const anchors = getSortedAnchorsByTimelineId(timelineId);
-        const { leftWorld, rightWorld } = getTimelineTrackWorldBounds();
-        const ratio = clamp((worldCenterX - leftWorld) / Math.max(rightWorld - leftWorld, 1), 0, 1);
-        if (!anchors.length) return 0;
-        const orders = anchors.map((item) => item.order);
-        const minOrder = Math.min(...orders);
-        const maxOrder = Math.max(...orders);
-        const span = maxOrder - minOrder;
-        if (span <= 0) {
-            return Math.round(minOrder + (ratio - 0.5) * 120);
-        }
-        return Math.round(minOrder + ratio * span);
+        const { originWorld, unitWorld } = getAnchorOrderScale();
+        return Number((ANCHOR_ORDER_MIN + ((worldCenterX - originWorld) / Math.max(unitWorld, 0.001))).toFixed(2));
     }
 
     function bindNodeToTimeline(nodeId, timelineId) {
