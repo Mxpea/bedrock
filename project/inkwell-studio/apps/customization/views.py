@@ -2,7 +2,7 @@ from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 from .css_validator import validate_advanced_css
 from .models import AdvancedStyleGrant, AuthorHomepageConfig, CSSSecurityEvent, CustomCSSRequest, ThemeConfig, CustomFont
@@ -63,7 +63,7 @@ class ThemeConfigViewSet(viewsets.ModelViewSet):
             img = Image.open(image_file)
             img.verify()
             image_file.seek(0)
-        except Exception:
+        except (UnidentifiedImageError, OSError):
             return Response({"detail": "图片处理失败，请上传有效图像"}, status=status.HTTP_400_BAD_REQUEST)
 
         from apps.novels.models import Novel

@@ -7,7 +7,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.utils.text import slugify
 from django.utils.html import strip_tags
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, UnidentifiedImageError
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -99,7 +99,7 @@ class NovelViewSet(viewsets.ModelViewSet):
             output = BytesIO()
             icon_256.save(output, format="PNG", optimize=True)
             output.seek(0)
-        except Exception:
+        except (UnidentifiedImageError, OSError):
             return Response({"detail": "图片处理失败，请上传有效图像"}, status=status.HTTP_400_BAD_REQUEST)
 
         workspace_segment = str(pk or workspace.pk)
@@ -204,7 +204,7 @@ class ChapterViewSet(viewsets.ModelViewSet):
             img = Image.open(image_file)
             img.verify()
             image_file.seek(0)
-        except Exception:
+        except (UnidentifiedImageError, OSError):
             return Response({"detail": "图片处理失败，请上传有效图像"}, status=status.HTTP_400_BAD_REQUEST)
 
         safe_stem = slugify(os.path.splitext(image_file.name)[0]) or "image"
@@ -335,7 +335,7 @@ class CharacterViewSet(viewsets.ModelViewSet):
             img = Image.open(avatar_file)
             img.verify()
             avatar_file.seek(0)
-        except Exception:
+        except (UnidentifiedImageError, OSError):
             return Response({"detail": "图片处理失败，请上传有效图像"}, status=status.HTTP_400_BAD_REQUEST)
 
         if character.avatar:
