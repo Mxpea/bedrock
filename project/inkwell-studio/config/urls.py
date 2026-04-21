@@ -18,7 +18,6 @@ from apps.novels.views import ChapterViewSet, NovelViewSet, CharacterViewSet, Wo
 
 router = DefaultRouter()
 router.register(r"novels", NovelViewSet, basename="novel")
-router.register(r"workspaces", NovelViewSet, basename="workspace")
 router.register(r"chapters", ChapterViewSet, basename="chapter")
 router.register(r"characters", CharacterViewSet, basename="character")
 router.register(r"worldview-entries", WorldviewEntryViewSet, basename="worldview-entry")

@@ -70,11 +70,17 @@ class Chapter(TimeStampedModel):
         ).exists()
 
     def save(self, *args, **kwargs):
-        # Standard authors use strict token rendering; advanced authors get limited HTML tags.
-        if self._author_has_advanced_markdown_access():
-            self.content_html = sanitize_advanced_content(self.content_md)
-        else:
-            self.content_html = sanitize_standard_content(self.content_md)
+        # Only re-render content_html when content_md has actually changed.
+        # This avoids an expensive Markdown render + AdvancedStyleGrant query
+        # on every save (e.g. publishing, reordering).
+        update_fields = kwargs.get("update_fields")
+        if update_fields is None or "content_md" in update_fields:
+            if self._author_has_advanced_markdown_access():
+                self.content_html = sanitize_advanced_content(self.content_md)
+            else:
+                self.content_html = sanitize_standard_content(self.content_md)
+            if update_fields is not None and "content_html" not in update_fields:
+                kwargs["update_fields"] = list(update_fields) + ["content_html"]
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:

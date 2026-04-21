@@ -16,6 +16,10 @@ class User(AbstractUser):
 
     REQUIRED_FIELDS = ["email"]
 
+    def is_admin_user(self) -> bool:
+        """Return True for superusers, staff, and users with the admin role."""
+        return bool(self.is_superuser or self.is_staff or self.role == self.Role.ADMIN)
+
 
 class InviteCode(TimeStampedModel):
     code = models.CharField(max_length=64, unique=True)
