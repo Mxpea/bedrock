@@ -28,7 +28,7 @@ class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
 
     def test_func(self):
         user = self.request.user
-        return user.is_authenticated and (user.is_superuser or user.is_staff or getattr(user, "role", "") == "admin")
+        return user.is_authenticated and user.is_admin_user()
 
 
 class SuperAdminRequiredMixin(AdminRequiredMixin):
@@ -599,8 +599,6 @@ class OpsToolsView(SuperAdminRequiredMixin, TemplateView):
         context.update(
             {
                 "audit_logs": AuditLog.objects.select_related("actor").order_by("-created_at")[:500],
-                "doc_service_status": "healthy",
-                "search_service_status": "healthy",
             }
         )
         return context

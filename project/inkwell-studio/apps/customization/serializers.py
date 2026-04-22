@@ -23,7 +23,8 @@ class CustomFontSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context.get("request")
-        validated_data["uploader"] = request.user
+        if request is not None and "uploader" not in validated_data:
+            validated_data["uploader"] = request.user
         return super().create(validated_data)
 
 

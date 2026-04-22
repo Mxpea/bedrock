@@ -1,4 +1,4 @@
-from django.contrib.auth import authenticate, login as auth_login
+from django.contrib.auth import get_user_model, login as auth_login
 from rest_framework import generics, permissions
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
@@ -26,11 +26,17 @@ class LoginView(TokenObtainPairView):
         response = super().post(request, *args, **kwargs)
 
         if response.status_code == 200:
+            # The JWT view has already verified the credentials.  Look up the
+            # user directly rather than calling authenticate() again (which
+            # would hash the password a second time).
             username = request.data.get("username")
-            password = request.data.get("password")
-            user = authenticate(request=request, username=username, password=password)
-            if user is not None:
+            User = get_user_model()
+            try:
+                user = User.objects.get(username=username, is_active=True)
+                user.backend = "django.contrib.auth.backends.ModelBackend"
                 auth_login(request, user)
+            except User.DoesNotExist:
+                pass
 
         return response
 

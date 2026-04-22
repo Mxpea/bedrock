@@ -24,7 +24,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
             setting = PlatformSetting.get_solo()
             require_invite = setting.registration_mode == PlatformSetting.RegistrationMode.INVITE_ONLY
-        except Exception:
+        except PlatformSetting.DoesNotExist:
             require_invite = False
 
         if require_invite and not value:
