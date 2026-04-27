@@ -13,6 +13,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.db.models import Max
 
@@ -25,6 +26,7 @@ from .serializers import ChapterSerializer, NovelSerializer, CharacterSerializer
 
 class NovelViewSet(viewsets.ModelViewSet):
     serializer_class = NovelSerializer
+    lookup_field = "public_id"
     filterset_fields = ["visibility"]
     search_fields = ["title", "summary"]
     ordering_fields = ["created_at", "updated_at", "title", "last_open_module"]
@@ -50,6 +52,11 @@ class NovelViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
+    def get_object(self):
+        lookup_value = self.kwargs.get(self.lookup_url_kwarg or self.lookup_field)
+        queryset = self.filter_queryset(self.get_queryset())
+        return get_object_or_404(queryset, Q(public_id=lookup_value) | Q(id=lookup_value))
+
     def perform_update(self, serializer):
         instance = self.get_object()
         user = self.request.user
@@ -71,7 +78,7 @@ class NovelViewSet(viewsets.ModelViewSet):
         parser_classes=[MultiPartParser, FormParser],
     )
     def upload_icon(self, request, pk=None):
-        workspace = self.get_queryset().filter(id=pk, author=request.user).first()
+        workspace = self.get_queryset().filter(Q(public_id=pk) | Q(id=pk), author=request.user).first()
         if not workspace:
             return Response({"detail": "工作区不存在或无权访问"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -102,7 +109,7 @@ class NovelViewSet(viewsets.ModelViewSet):
         except Exception:
             return Response({"detail": "图片处理失败，请上传有效图像"}, status=status.HTTP_400_BAD_REQUEST)
 
-        workspace_segment = str(pk or workspace.pk)
+        workspace_segment = workspace.public_id or str(pk or workspace.pk)
         icon_name = f"workspace-icons/user_{request.user.id}/workspace_{workspace_segment}/icon-{uuid.uuid4().hex[:10]}.png"
 
         if workspace.icon:
@@ -158,7 +165,7 @@ class ChapterViewSet(viewsets.ModelViewSet):
 
         use_advanced = False
         if novel_id:
-            novel = Novel.objects.filter(id=novel_id, author=request.user, is_deleted=False).first()
+            novel = Novel.objects.filter(Q(public_id=novel_id) | Q(id=novel_id), author=request.user, is_deleted=False).first()
             if novel:
                 use_advanced = AdvancedStyleGrant.objects.filter(
                     Q(user=request.user, enabled=True, scope=AdvancedStyleGrant.Scope.ACCOUNT)
@@ -179,7 +186,7 @@ class ChapterViewSet(viewsets.ModelViewSet):
         if not novel_id:
             return Response({"detail": "缺少工作区ID"}, status=status.HTTP_400_BAD_REQUEST)
 
-        novel = Novel.objects.filter(id=novel_id, author=request.user, is_deleted=False).first()
+        novel = Novel.objects.filter(Q(public_id=novel_id) | Q(id=novel_id), author=request.user, is_deleted=False).first()
         if not novel:
             return Response({"detail": "工作区不存在或无权访问"}, status=status.HTTP_404_NOT_FOUND)
         if novel.is_locked:
@@ -202,7 +209,7 @@ class ChapterViewSet(viewsets.ModelViewSet):
 
         safe_stem = slugify(os.path.splitext(image_file.name)[0]) or "image"
         safe_name = f"{safe_stem}-{uuid.uuid4().hex[:10]}{ext}"
-        workspace_segment = str(novel_id)
+        workspace_segment = novel.public_id or str(novel_id)
         storage_path = (
             f"workspace_assets/user_{request.user.id}/workspace_{workspace_segment}/images/{safe_name}"
         )
@@ -224,7 +231,7 @@ class CharacterViewSet(viewsets.ModelViewSet):
 
         novel_id = self.request.GET.get("novel")
         if novel_id:
-            queryset = queryset.filter(novel_id=novel_id)
+            queryset = queryset.filter(Q(novel_id=novel_id) | Q(novel__public_id=novel_id))
 
         keyword = (self.request.GET.get("q") or "").strip()
         if keyword:
@@ -332,7 +339,7 @@ class CharacterViewSet(viewsets.ModelViewSet):
             ext = ".png"
 
         avatar_name = (
-            f"character-avatars/user_{request.user.id}/workspace_{character.novel_id}/"
+            f"character-avatars/user_{request.user.id}/workspace_{character.novel.public_id or character.novel_id}/"
             f"character_{character.id}_{uuid.uuid4().hex[:10]}{ext}"
         )
 
@@ -359,7 +366,7 @@ class WorldviewEntryViewSet(viewsets.ModelViewSet):
 
         novel_id = (self.request.GET.get("novel") or "").strip()
         if novel_id:
-            queryset = queryset.filter(novel_id=novel_id)
+            queryset = queryset.filter(Q(novel_id=novel_id) | Q(novel__public_id=novel_id))
 
         keyword = (self.request.GET.get("q") or "").strip()
         if keyword:

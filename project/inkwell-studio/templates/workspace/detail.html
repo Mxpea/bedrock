@@ -4,7 +4,7 @@
 {% block title %}{{ workspace.title }} - 工作区{% endblock %}
 
 {% block content %}
-<div data-workspace-context data-workspace-id="{{ workspace.id }}" data-workspace-title="{{ workspace.title }}" data-workspace-icon-url="{% if workspace.icon %}{{ workspace.icon.url }}{% endif %}" data-workspace-module="{{ module }}" data-workspace-chapter-id="{% if active_chapter %}{{ active_chapter.id }}{% endif %}"></div>
+<div data-workspace-context data-workspace-id="{{ workspace.public_id }}" data-workspace-title="{{ workspace.title }}" data-workspace-icon-url="{% if workspace.icon %}{{ workspace.icon.url }}{% endif %}" data-workspace-module="{{ module }}" data-workspace-chapter-id="{% if active_chapter %}{{ active_chapter.id }}{% endif %}"></div>
 <section id="workspace-shell" class="workspace-shell {% if module == 'writing' %}workspace-shell-writing{% endif %} {% if module == 'outline' %}workspace-shell-outline{% endif %} {% if module == 'worldbuilding' %}workspace-shell-worldbuilding{% endif %}">
     <aside id="workspace-sidebar" class="workspace-sidebar">
         <div class="workspace-sidebar-head">
@@ -22,17 +22,17 @@
             <details class="workspace-group-fold" open>
                 <summary class="workspace-group-title">创作模块</summary>
                 <div class="workspace-group">
-                    <a class="workspace-nav-item {% if module == 'writing' %}active{% endif %}" href="/workspace/{{ workspace.id }}/writing/">📖 正文</a>
-                    <a class="workspace-nav-item {% if module == 'outline' %}active{% endif %}" href="/workspace/{{ workspace.id }}/outline/">🗺️ 大纲</a>
-                    <a class="workspace-nav-item {% if module == 'characters' %}active{% endif %}" href="/workspace/{{ workspace.id }}/characters/">👥 人物</a>
-                    <a class="workspace-nav-item {% if module == 'worldbuilding' %}active{% endif %}" href="/workspace/{{ workspace.id }}/worldbuilding/">🌍 世界观</a>
+                    <a class="workspace-nav-item {% if module == 'writing' %}active{% endif %}" href="/workspace/{{ workspace.public_id }}/writing/">📖 正文</a>
+                    <a class="workspace-nav-item {% if module == 'outline' %}active{% endif %}" href="/workspace/{{ workspace.public_id }}/outline/">🗺️ 大纲</a>
+                    <a class="workspace-nav-item {% if module == 'characters' %}active{% endif %}" href="/workspace/{{ workspace.public_id }}/characters/">👥 人物</a>
+                    <a class="workspace-nav-item {% if module == 'worldbuilding' %}active{% endif %}" href="/workspace/{{ workspace.public_id }}/worldbuilding/">🌍 世界观</a>
                 </div>
             </details>
             <details class="workspace-group-fold" open>
                 <summary class="workspace-group-title">工作区管理</summary>
                 <div class="workspace-group">
-                    <a class="workspace-nav-item {% if module == 'appearance' %}active{% endif %}" href="/workspace/{{ workspace.id }}/appearance/">🎨 外观定制</a>
-                    <a class="workspace-nav-item {% if module == 'settings' %}active{% endif %}" href="/workspace/{{ workspace.id }}/settings/">⚙️ 工作区设置</a>
+                    <a class="workspace-nav-item {% if module == 'appearance' %}active{% endif %}" href="/workspace/{{ workspace.public_id }}/appearance/">🎨 外观定制</a>
+                    <a class="workspace-nav-item {% if module == 'settings' %}active{% endif %}" href="/workspace/{{ workspace.public_id }}/settings/">⚙️ 工作区设置</a>
                 </div>
             </details>
             <details class="workspace-group-fold" open>
@@ -521,7 +521,7 @@
 
                 <aside class="workspace-settings-side">
                     <div class="workspace-card workspace-settings-meta">
-                        <p><strong>工作区 ID：</strong>{{ workspace.id }}</p>
+                        <p><strong>工作区 ID：</strong>{{ workspace.public_id }}</p>
                         <p><strong>当前可见性：</strong>{{ workspace.get_visibility_display }}</p>
                         <p><strong>创建时间：</strong>{{ workspace.created_at|date:"Y-m-d H:i" }}</p>
                         <p><strong>最后更新：</strong>{{ workspace.updated_at|date:"Y-m-d H:i" }}</p>
@@ -560,7 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    const workspaceId = '{{ workspace.id }}';
+    const workspaceId = '{{ workspace.public_id }}';
 
     const setMessage = (text, isError = false) => {
         if (!message) return;
@@ -674,7 +674,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (workspaceLabel) {
-                const workspaceIdText = data.id || workspaceId;
+                const workspaceIdText = data.public_id || workspaceId;
                 workspaceLabel.textContent = `${data.title || payload.title} #${workspaceIdText}`;
             }
 
@@ -733,7 +733,7 @@ document.addEventListener('DOMContentLoaded', () => {
 {% if module == 'characters' %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const workspaceId = Number('{{ workspace.id }}');
+    const workspaceId = '{{ workspace.public_id }}';
     const searchInput = document.getElementById('char-search');
     const starFilterBtn = document.getElementById('char-star-filter');
     const createBtn = document.getElementById('char-create-btn');
@@ -1491,7 +1491,7 @@ document.addEventListener('DOMContentLoaded', () => {
         background_opacity: 0.22,
     };
 
-    const workspaceId = Number('{{ workspace.id }}');
+    const workspaceId = '{{ workspace.public_id }}';
     let themeConfigId = Number('{{ theme_config.id|default:0 }}') || null;
     let backgroundImageUrl = '{{ theme_config.background_image_url|default:""|escapejs }}';
 

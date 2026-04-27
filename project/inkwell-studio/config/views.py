@@ -41,7 +41,11 @@ class WorkspacePageView(LoginRequiredMixin, TemplateView):
         workspace_id = kwargs.get("workspace_id")
         module = kwargs.get("module") or Novel.Module.WRITING
 
-        workspace = get_object_or_404(Novel, id=workspace_id, is_deleted=False)
+        workspace = get_object_or_404(
+            Novel,
+            models.Q(public_id=workspace_id) | models.Q(id=workspace_id),
+            is_deleted=False,
+        )
         if workspace.author != self.request.user:
             raise Http404("你无权访问该工作区")
 
@@ -132,7 +136,9 @@ class ReaderPageView(TemplateView):
         if chapter_id:
             chapter = chapter_qs.filter(id=chapter_id).first()
         elif workspace_id:
-            chapter = chapter_qs.filter(novel_id=workspace_id).order_by("order", "id").first()
+            chapter = chapter_qs.filter(
+                models.Q(novel_id=workspace_id) | models.Q(novel__public_id=workspace_id)
+            ).order_by("order", "id").first()
         else:
             chapter = chapter_qs.order_by("-updated_at").first()
 
@@ -206,15 +212,16 @@ class AuthorProfilePageView(TemplateView):
         for workspace in queryset:
             items.append(
                 {
-                    "id": workspace.id,
+                    "id": workspace.public_id,
                     "title": workspace.title,
                     "summary": workspace.summary or "",
                     "cover_url": workspace.icon.url if workspace.icon else "",
                     "visibility": workspace.visibility,
                     "visibility_label": workspace.get_visibility_display(),
                     "updated_at": workspace.updated_at.isoformat() if workspace.updated_at else "",
+                    "public_id": workspace.public_id,
                     "chapter_count": workspace.chapters.filter(is_published=True).count(),
-                    "read_url": f"/reader/?workspace_id={workspace.id}",
+                    "read_url": f"/reader/?workspace_id={workspace.public_id}",
                 }
             )
         return items

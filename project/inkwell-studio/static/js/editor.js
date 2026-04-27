@@ -379,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fromData = contextNode ? contextNode.dataset.workspaceId : null;
         const fromWindow = window.BEDROCK_WORKSPACE && window.BEDROCK_WORKSPACE.id ? String(window.BEDROCK_WORKSPACE.id) : null;
         const fromQuery = params.get('workspace_id') || params.get('novel_id');
-        const pathMatch = window.location.pathname.match(/^\/workspace\/(\d+)\//);
+        const pathMatch = window.location.pathname.match(/^\/workspace\/([^/]+)\//);
         const fromPath = pathMatch ? pathMatch[1] : null;
 
         return {

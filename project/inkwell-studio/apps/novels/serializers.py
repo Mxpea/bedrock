@@ -21,6 +21,7 @@ class NovelSerializer(serializers.ModelSerializer):
         model = Novel
         fields = [
             "id",
+            "public_id",
             "title",
             "summary",
             "icon",

@@ -64,7 +64,7 @@ class ThemeConfigViewSet(viewsets.ModelViewSet):
 
         from apps.novels.models import Novel
 
-        novel = Novel.objects.filter(id=novel_id, author=request.user, is_deleted=False).first()
+        novel = Novel.objects.filter(Q(public_id=novel_id) | Q(id=novel_id), author=request.user, is_deleted=False).first()
         if not novel:
             return Response({"detail": "工作区不存在或无权访问"}, status=status.HTTP_404_NOT_FOUND)
 

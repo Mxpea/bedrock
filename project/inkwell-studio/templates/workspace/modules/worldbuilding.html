@@ -1,5 +1,5 @@
 <section class="workspace-panel worldview-panel-v2">
-    <div class="worldview-v2" id="worldview-v2-app" data-api-base="/api/worldview-entries/" data-workspace-id="{{ workspace.id }}">
+    <div class="worldview-v2" id="worldview-v2-app" data-api-base="/api/worldview-entries/" data-workspace-id="{{ workspace.public_id }}">
         <aside class="worldview-v2-sidebar">
             <div class="worldview-v2-toolbar">
                 <input id="wv-search" type="search" placeholder="搜索词条 / 别名 / 正文...">
@@ -111,7 +111,7 @@
         <section id="wv-search-center" class="wv-search-center" hidden>
             <div class="wv-search-center-head">
                 <h2>强检索中心</h2>
-                <a id="wv-close-search" class="button secondary" href="/workspace/{{ workspace.id }}/worldbuilding/">返回编辑器</a>
+                <a id="wv-close-search" class="button secondary" href="/workspace/{{ workspace.public_id }}/worldbuilding/">返回编辑器</a>
             </div>
 
             <div class="wv-search-grid">

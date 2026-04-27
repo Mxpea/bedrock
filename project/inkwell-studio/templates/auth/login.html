@@ -8,6 +8,7 @@
         <p class="eyebrow">登录</p>
         <h1>进入你的写作空间</h1>
         <form class="stack-form" data-auth-form="login">
+            {% csrf_token %}
             <label>
                 <span>用户名</span>
                 <input type="text" name="username" autocomplete="username" required>

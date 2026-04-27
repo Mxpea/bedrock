@@ -36,8 +36,6 @@ function setupTopbarCollapse() {
         }
     };
 
-    setCollapsed(localStorage.getItem(TOPBAR_COLLAPSE_KEY) === "1", false);
-
     collapseBtn.addEventListener("click", () => {
         const collapsed = document.body.classList.toggle("topbar-collapsed");
         setCollapsed(collapsed);
@@ -46,6 +44,35 @@ function setupTopbarCollapse() {
     expandBtn.addEventListener("click", () => {
         setCollapsed(false);
     });
+
+    setCollapsed(localStorage.getItem(TOPBAR_COLLAPSE_KEY) === "1", false);
+}
+
+async function renameWorkspace(event, workspaceId, currentTitle) {
+    if (event) {
+        event.preventDefault();
+    }
+
+    const nextTitle = window.prompt("请输入新的工作区名称", currentTitle || "新工作区");
+    if (!nextTitle) {
+        return;
+    }
+
+    const response = await fetchWithAuthRetry(`/api/workspaces/${workspaceId}/`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({title: nextTitle.trim()}),
+    });
+
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        window.alert(extractMessage(payload) || "改名失败");
+        return;
+    }
+
+    window.location.reload();
 }
 
 function getAccessToken() {
@@ -295,10 +322,11 @@ async function setupWorkspaceSwitcher() {
 
         const payload = await response.json();
         const workspaces = (Array.isArray(payload) ? payload : payload.results || []).slice(0, 5);
+        const workspaceId = workspace.public_id || workspace.id;
         const summaryIcon = workspaceIconHtml(workspace.title || "当前工作区", workspace.icon_url || "", "switcher");
         const items = workspaces.length
             ? workspaces.map((item) => `
-                <a class="workspace-switcher-item ${String(item.id) === String(workspace.id) ? "active" : ""}" href="/workspace/${item.id}/writing/">
+                <a class="workspace-switcher-item ${String(item.public_id || item.id) === String(workspaceId) ? "active" : ""}" href="/workspace/${item.public_id || item.id}/writing/">
                     ${workspaceIconHtml(item.title, item.icon_url || "", "switcher")}
                     <div class="workspace-switcher-item-text">
                         <strong>${escapeHtml(item.title)}</strong>
@@ -369,7 +397,7 @@ async function createWorkspace(event) {
     }
 
     const workspace = await response.json();
-    window.location.href = `/workspace/${workspace.id}/writing/`;
+    window.location.href = `/workspace/${workspace.public_id || workspace.id}/writing/`;
 }
 
 async function loadCustomFonts(force = false) {
@@ -473,9 +501,13 @@ function setupAuthForms() {
             }
 
             try {
+                const csrfToken = getCookie("csrftoken");
                 const response = await fetch(endpoint, {
                     method: "POST",
-                    headers: {"Content-Type": "application/json"},
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(csrfToken ? {"X-CSRFToken": csrfToken} : {}),
+                    },
                     body: JSON.stringify(data),
                 });
                 const payload = await response.json().catch(() => ({}));
@@ -579,7 +611,10 @@ async function setupWorkspaceDashboard() {
         return;
     }
 
-    container.innerHTML = workspaces.map((workspace) => `
+    container.innerHTML = workspaces.map((workspace) => {
+        const workspaceId = workspace.public_id || workspace.id;
+        const titleJson = JSON.stringify(workspace.title || "");
+        return `
         <article class="card workspace-card">
             <div class="workspace-card-top">
                 <div class="workspace-card-heading">
@@ -596,12 +631,14 @@ async function setupWorkspaceDashboard() {
                 <span>最近模块：${escapeHtml(workspace.module_label || workspace.last_open_module || "writing")}</span>
                 <span>更新时间：${formatDate(workspace.updated_at)}</span>
             </div>
-            <div class="actions">
-                <a class="button primary" href="/workspace/${workspace.id}/writing/">进入工作区</a>
-                <a class="button secondary" href="/workspace/${workspace.id}/settings/">设置</a>
+            <div class="workspace-card-actions">
+                <a class="button primary" href="/workspace/${workspaceId}/writing/">进入工作区</a>
+                <a class="button secondary" href="/workspace/${workspaceId}/settings/">设置</a>
+                <button class="button secondary" type="button" onclick="renameWorkspace(event, '${workspaceId}', ${titleJson})">改名</button>
             </div>
         </article>
-    `).join("");
+        `;
+    }).join("");
 }
 
 async function setupWorkspaceDiscover() {
@@ -641,7 +678,7 @@ async function setupWorkspaceDiscover() {
                 <span>更新时间：${formatDate(workspace.updated_at)}</span>
             </div>
             <div class="actions">
-                <a class="button primary" href="/reader/?workspace_id=${workspace.id}">阅读</a>
+                <a class="button primary" href="/reader/?workspace_id=${workspace.public_id || workspace.id}">阅读</a>
                 <a class="button secondary" href="/u/${escapeHtml(workspace.author_username || "")}/">作者主页</a>
             </div>
         </article>

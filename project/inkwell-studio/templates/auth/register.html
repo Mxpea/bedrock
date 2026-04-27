@@ -8,6 +8,7 @@
         <p class="eyebrow">注册</p>
         <h1>创建新作者账号</h1>
         <form class="stack-form" data-auth-form="register">
+            {% csrf_token %}
             <label>
                 <span>用户名</span>
                 <input type="text" name="username" autocomplete="username" required>

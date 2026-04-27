@@ -1,10 +1,15 @@
 from django.conf import settings
 from django.db import models
 import re
+import uuid
 
 from apps.customization.markdown_extensions import sanitize_advanced_content, sanitize_standard_content
 from apps.customization.models import AdvancedStyleGrant
 from apps.core.models import TimeStampedModel
+
+
+def generate_public_id() -> str:
+    return f"wk_{uuid.uuid4().hex[:12]}"
 
 
 class Novel(TimeStampedModel):
@@ -24,6 +29,7 @@ class Novel(TimeStampedModel):
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="novels")
     title = models.CharField(max_length=200)
     summary = models.TextField(blank=True)
+    public_id = models.CharField(max_length=16, unique=True, db_index=True, editable=False)
     icon = models.ImageField(upload_to="workspace_icons/", blank=True, null=True)
     is_locked = models.BooleanField(default=False)
     visibility = models.CharField(max_length=16, choices=Visibility.choices, default=Visibility.PRIVATE)
@@ -38,6 +44,11 @@ class Novel(TimeStampedModel):
 
     def __str__(self) -> str:
         return self.title
+
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_public_id()
+        super().save(*args, **kwargs)
 
     @property
     def workspace_name(self) -> str:
@@ -105,40 +116,6 @@ class Character(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.novel.title}-{self.name}"
-
-    def compute_chapter_mentions(self):
-        token_pat = re.compile(r"\{\s*@?人物\s*:\s*([^}]+?)\s*\}")
-        at_pat = re.compile(r"(?<![\w\u4e00-\u9fa5])@([\u4e00-\u9fa5A-Za-z0-9_\-]{2,40})")
-
-        names = {self.name.strip()}
-        names.update([str(alias).strip() for alias in (self.aliases or []) if str(alias).strip()])
-
-        hits = []
-        for chapter in self.novel.chapters.all().order_by("order", "id"):
-            text = chapter.content_md or ""
-            matched = False
-
-            for token_name in token_pat.findall(text):
-                if token_name.strip() in names:
-                    matched = True
-                    break
-
-            if not matched:
-                for at_name in at_pat.findall(text):
-                    if at_name.strip() in names:
-                        matched = True
-                        break
-
-            if matched:
-                hits.append(
-                    {
-                        "chapter_id": chapter.id,
-                        "chapter_title": chapter.title,
-                        "chapter_order": chapter.order,
-                    }
-                )
-
-        return hits
 
 
 class WorldviewEntry(TimeStampedModel):
