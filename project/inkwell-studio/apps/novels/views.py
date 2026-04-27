@@ -7,7 +7,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.utils.text import slugify
 from django.utils.html import strip_tags
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, UnidentifiedImageError
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -60,7 +60,7 @@ class NovelViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         instance = self.get_object()
         user = self.request.user
-        is_admin = user.is_superuser or user.is_staff or getattr(user, "role", "") == "admin"
+        is_admin = user.is_admin_user()
         if instance.is_locked and instance.author == user and not is_admin:
             raise PermissionDenied("工作区已被锁定，暂不可修改")
         serializer.save()
@@ -82,7 +82,7 @@ class NovelViewSet(viewsets.ModelViewSet):
         if not workspace:
             return Response({"detail": "工作区不存在或无权访问"}, status=status.HTTP_404_NOT_FOUND)
 
-        is_admin = request.user.is_superuser or request.user.is_staff or getattr(request.user, "role", "") == "admin"
+        is_admin = request.user.is_admin_user()
         if workspace.is_locked and workspace.author == request.user and not is_admin:
             return Response({"detail": "工作区已被锁定，暂不可修改图标"}, status=status.HTTP_403_FORBIDDEN)
 
@@ -106,7 +106,7 @@ class NovelViewSet(viewsets.ModelViewSet):
             output = BytesIO()
             icon_256.save(output, format="PNG", optimize=True)
             output.seek(0)
-        except Exception:
+        except (UnidentifiedImageError, OSError):
             return Response({"detail": "图片处理失败，请上传有效图像"}, status=status.HTTP_400_BAD_REQUEST)
 
         workspace_segment = workspace.public_id or str(pk or workspace.pk)
@@ -206,6 +206,13 @@ class ChapterViewSet(viewsets.ModelViewSet):
         ext = os.path.splitext(image_file.name)[1].lower()
         if ext not in {".png", ".jpg", ".jpeg", ".gif", ".webp"}:
             return Response({"detail": "不支持的图片格式"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            img = Image.open(image_file)
+            img.verify()
+            image_file.seek(0)
+        except (UnidentifiedImageError, OSError):
+            return Response({"detail": "图片处理失败，请上传有效图像"}, status=status.HTTP_400_BAD_REQUEST)
 
         safe_stem = slugify(os.path.splitext(image_file.name)[0]) or "image"
         safe_name = f"{safe_stem}-{uuid.uuid4().hex[:10]}{ext}"
@@ -330,6 +337,13 @@ class CharacterViewSet(viewsets.ModelViewSet):
         max_size = 10 * 1024 * 1024
         if avatar_file.size > max_size:
             return Response({"detail": "头像大小不能超过 10MB"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            img = Image.open(avatar_file)
+            img.verify()
+            avatar_file.seek(0)
+        except (UnidentifiedImageError, OSError):
+            return Response({"detail": "图片处理失败，请上传有效图像"}, status=status.HTTP_400_BAD_REQUEST)
 
         if character.avatar:
             character.avatar.delete(save=False)

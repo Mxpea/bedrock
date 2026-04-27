@@ -132,12 +132,12 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-# Password hasher iterations align with security requirement baseline.
+# Use a custom hasher subclass so PBKDF2_ITERATIONS env var actually controls
+# the iteration count.  Django's built-in hasher ignores Django settings for
+# this value; reading the env var directly inside the subclass is required.
 PASSWORD_HASHERS = [
-    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "config.hashers.CustomPBKDF2PasswordHasher",
 ]
-
-PBKDF2_ITERATIONS = int(os.getenv("PBKDF2_ITERATIONS", "600000"))
 
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")

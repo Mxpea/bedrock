@@ -6,6 +6,7 @@ from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
+from PIL import Image, UnidentifiedImageError
 
 from .css_validator import validate_advanced_css
 from .models import AdvancedStyleGrant, AuthorHomepageConfig, CSSSecurityEvent, CustomCSSRequest, ThemeConfig, CustomFont
@@ -62,6 +63,13 @@ class ThemeConfigViewSet(viewsets.ModelViewSet):
         if image_file.size > 12 * 1024 * 1024:
             return Response({"detail": "背景图片大小不能超过 12MB"}, status=status.HTTP_400_BAD_REQUEST)
 
+        try:
+            img = Image.open(image_file)
+            img.verify()
+            image_file.seek(0)
+        except (UnidentifiedImageError, OSError):
+            return Response({"detail": "图片处理失败，请上传有效图像"}, status=status.HTTP_400_BAD_REQUEST)
+
         from apps.novels.models import Novel
 
         novel = Novel.objects.filter(Q(public_id=novel_id) | Q(id=novel_id), author=request.user, is_deleted=False).first()
@@ -95,7 +103,7 @@ class CustomCSSRequestViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_staff or getattr(user, "role", "") == "admin":
+        if user.is_admin_user():
             return CustomCSSRequest.objects.select_related("applicant", "novel", "reviewed_by").all()
         return CustomCSSRequest.objects.select_related("novel").filter(applicant=user)
 
