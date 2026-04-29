@@ -16,6 +16,83 @@ document.addEventListener("DOMContentLoaded", () => {
     setupWorkspaceSwitcher();
 });
 
+/* Theme handling: respects saved preference, falls back to system preference */
+const THEME_KEY = 'bedrock_theme'; // values: 'dark', 'light', 'auto'
+
+function getSavedTheme() {
+    return localStorage.getItem(THEME_KEY) || null;
+}
+
+function saveTheme(value) {
+    if (value === null) {
+        localStorage.removeItem(THEME_KEY);
+    } else {
+        localStorage.setItem(THEME_KEY, value);
+    }
+}
+
+function systemPrefersDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function applyTheme(theme) {
+    const body = document.body;
+    let effective = theme;
+    if (!effective || effective === 'auto') {
+        effective = systemPrefersDark() ? 'dark' : 'light';
+    }
+
+    if (effective === 'dark') {
+        body.classList.add('dark-mode');
+    } else {
+        body.classList.remove('dark-mode');
+    }
+
+    // update toggle button state/icon
+    const btn = document.querySelector('.global-theme-toggle');
+    if (btn) {
+        btn.setAttribute('aria-pressed', effective === 'dark');
+        btn.dataset.theme = effective;
+    }
+}
+
+function toggleTheme() {
+    const saved = getSavedTheme();
+    let next;
+    if (!saved || saved === 'auto') {
+        // if auto or unset, toggle from system/effective
+        const effective = document.body.classList.contains('dark-mode') ? 'dark' : 'light';
+        next = effective === 'dark' ? 'light' : 'dark';
+    } else {
+        next = saved === 'dark' ? 'light' : 'dark';
+    }
+    saveTheme(next);
+    applyTheme(next);
+}
+
+function setupGlobalTheme() {
+    // apply saved or system theme on load
+    const saved = getSavedTheme();
+    applyTheme(saved || 'auto');
+
+    // listen for system changes when in 'auto'
+    if (window.matchMedia) {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        mq.addEventListener && mq.addEventListener('change', (e) => {
+            const savedNow = getSavedTheme();
+            if (!savedNow || savedNow === 'auto') {
+                applyTheme('auto');
+            }
+        });
+    }
+
+    // attach toggle
+    const btn = document.querySelector('.global-theme-toggle');
+    if (btn) {
+        btn.addEventListener('click', (e) => { e.preventDefault(); toggleTheme(); });
+    }
+}
+
 function setupTopbarCollapse() {
     const topbar = document.getElementById("global-topbar");
     const collapseBtn = document.getElementById("topbar-collapse-btn");
@@ -292,6 +369,7 @@ async function setupNavigation() {
         <a href="/dashboard/">工作台</a>
         <a href="/novels/">发现</a>
         ${adminLink}
+        <a href="/settings/">设置</a>
         <a href="/u/${escapeHtml(user.username)}/">个人</a>
         <a href="#" onclick="logout(event)">退出 (${escapeHtml(user.username)})</a>
     `;
@@ -450,42 +528,7 @@ async function loadCustomFonts(force = false) {
     }
 }
 
-function setupGlobalTheme() {
-    const toggleBtn = document.querySelector(".global-theme-toggle");
-    const svgPath = toggleBtn ? toggleBtn.querySelector("path") : null;
-
-    if (localStorage.getItem("bedrock-theme") === "dark") {
-        document.documentElement.classList.add("dark-mode");
-        document.body.classList.add("dark-mode");
-        if (svgPath) setSunIcon(svgPath);
-    } else if (svgPath) {
-        setMoonIcon(svgPath);
-    }
-
-    if (toggleBtn) {
-        toggleBtn.addEventListener("click", () => {
-            document.documentElement.classList.toggle("dark-mode");
-            document.body.classList.toggle("dark-mode");
-            const isDark = document.body.classList.contains("dark-mode");
-
-            if (isDark) {
-                localStorage.setItem("bedrock-theme", "dark");
-                if (svgPath) setSunIcon(svgPath);
-            } else {
-                localStorage.setItem("bedrock-theme", "light");
-                if (svgPath) setMoonIcon(svgPath);
-            }
-        });
-    }
-}
-
-function setSunIcon(path) {
-    path.setAttribute("d", "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z");
-}
-
-function setMoonIcon(path) {
-    path.setAttribute("d", "M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z");
-}
+// (Legacy theme code removed; new theme handling implemented above)
 
 function setupAuthForms() {
     document.querySelectorAll("[data-auth-form]").forEach((form) => {

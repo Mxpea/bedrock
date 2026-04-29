@@ -45,6 +45,7 @@ class NovelSerializer(serializers.ModelSerializer):
 
 
 class ChapterSerializer(serializers.ModelSerializer):
+    novel = serializers.SlugRelatedField(slug_field="public_id", queryset=Novel.objects.filter(is_deleted=False))
     workspace_name = serializers.CharField(source="novel.title", read_only=True)
 
     class Meta:
@@ -65,6 +66,7 @@ class ChapterSerializer(serializers.ModelSerializer):
 
 
 class CharacterSerializer(serializers.ModelSerializer):
+    novel = serializers.SlugRelatedField(slug_field="public_id", queryset=Novel.objects.filter(is_deleted=False))
     avatar_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -150,6 +152,7 @@ class CharacterSerializer(serializers.ModelSerializer):
 
 
 class WorldviewEntrySerializer(serializers.ModelSerializer):
+    novel = serializers.SlugRelatedField(slug_field="public_id", queryset=Novel.objects.filter(is_deleted=False))
     incoming_links = serializers.SerializerMethodField()
     outgoing_links = serializers.SerializerMethodField()
 

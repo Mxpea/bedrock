@@ -24,6 +24,13 @@ from .permissions import CanReadNovel, IsAuthorOrReadOnly
 from .serializers import ChapterSerializer, NovelSerializer, CharacterSerializer, WorldviewEntrySerializer
 
 
+def build_workspace_q(value):
+    lookup = Q(public_id=value)
+    if str(value).isdigit():
+        lookup |= Q(id=value)
+    return lookup
+
+
 class NovelViewSet(viewsets.ModelViewSet):
     serializer_class = NovelSerializer
     lookup_field = "public_id"
@@ -55,7 +62,7 @@ class NovelViewSet(viewsets.ModelViewSet):
     def get_object(self):
         lookup_value = self.kwargs.get(self.lookup_url_kwarg or self.lookup_field)
         queryset = self.filter_queryset(self.get_queryset())
-        return get_object_or_404(queryset, Q(public_id=lookup_value) | Q(id=lookup_value))
+        return get_object_or_404(queryset, build_workspace_q(lookup_value))
 
     def perform_update(self, serializer):
         instance = self.get_object()
@@ -78,7 +85,7 @@ class NovelViewSet(viewsets.ModelViewSet):
         parser_classes=[MultiPartParser, FormParser],
     )
     def upload_icon(self, request, pk=None):
-        workspace = self.get_queryset().filter(Q(public_id=pk) | Q(id=pk), author=request.user).first()
+        workspace = self.get_queryset().filter(build_workspace_q(pk), author=request.user).first()
         if not workspace:
             return Response({"detail": "工作区不存在或无权访问"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -124,13 +131,29 @@ class NovelViewSet(viewsets.ModelViewSet):
 class ChapterViewSet(viewsets.ModelViewSet):
     serializer_class = ChapterSerializer
     permission_classes = [permissions.IsAuthenticated, IsAuthorOrReadOnly]
-    filterset_fields = ["novel", "is_published"]
     search_fields = ["title", "content_md"]
     ordering_fields = ["order", "created_at"]
 
     def get_queryset(self):
         user = self.request.user
-        return Chapter.objects.select_related("novel").filter(novel__author=user, novel__is_deleted=False)
+        queryset = Chapter.objects.select_related("novel").filter(novel__author=user, novel__is_deleted=False)
+
+        novel_id = self.request.GET.get("novel")
+        if novel_id:
+            chapter_filter = Q(novel__public_id=novel_id)
+            if str(novel_id).isdigit():
+                chapter_filter |= Q(novel_id=novel_id)
+            queryset = queryset.filter(chapter_filter)
+
+        is_published = self.request.GET.get("is_published")
+        if is_published is not None and is_published != "":
+            is_published_value = str(is_published).strip().lower()
+            if is_published_value in {"1", "true", "yes"}:
+                queryset = queryset.filter(is_published=True)
+            elif is_published_value in {"0", "false", "no"}:
+                queryset = queryset.filter(is_published=False)
+
+        return queryset
 
     def perform_create(self, serializer):
         novel = serializer.validated_data["novel"]
@@ -165,7 +188,7 @@ class ChapterViewSet(viewsets.ModelViewSet):
 
         use_advanced = False
         if novel_id:
-            novel = Novel.objects.filter(Q(public_id=novel_id) | Q(id=novel_id), author=request.user, is_deleted=False).first()
+            novel = Novel.objects.filter(build_workspace_q(novel_id), author=request.user, is_deleted=False).first()
             if novel:
                 use_advanced = AdvancedStyleGrant.objects.filter(
                     Q(user=request.user, enabled=True, scope=AdvancedStyleGrant.Scope.ACCOUNT)
@@ -186,7 +209,7 @@ class ChapterViewSet(viewsets.ModelViewSet):
         if not novel_id:
             return Response({"detail": "缺少工作区ID"}, status=status.HTTP_400_BAD_REQUEST)
 
-        novel = Novel.objects.filter(Q(public_id=novel_id) | Q(id=novel_id), author=request.user, is_deleted=False).first()
+        novel = Novel.objects.filter(build_workspace_q(novel_id), author=request.user, is_deleted=False).first()
         if not novel:
             return Response({"detail": "工作区不存在或无权访问"}, status=status.HTTP_404_NOT_FOUND)
         if novel.is_locked:
@@ -235,10 +258,6 @@ class CharacterViewSet(viewsets.ModelViewSet):
             novel__author=self.request.user,
             novel__is_deleted=False,
         )
-
-        novel_id = self.request.GET.get("novel")
-        if novel_id:
-            queryset = queryset.filter(Q(novel_id=novel_id) | Q(novel__public_id=novel_id))
 
         keyword = (self.request.GET.get("q") or "").strip()
         if keyword:
@@ -377,10 +396,6 @@ class WorldviewEntryViewSet(viewsets.ModelViewSet):
             novel__author=self.request.user,
             novel__is_deleted=False,
         )
-
-        novel_id = (self.request.GET.get("novel") or "").strip()
-        if novel_id:
-            queryset = queryset.filter(Q(novel_id=novel_id) | Q(novel__public_id=novel_id))
 
         keyword = (self.request.GET.get("q") or "").strip()
         if keyword:

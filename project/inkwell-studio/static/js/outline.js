@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!canvasEl || !layoutEl) return;
 
     const workspaceCtx = document.querySelector("[data-workspace-context]");
-    const workspaceId = Number(workspaceCtx?.dataset.workspaceId || 0);
+    const workspaceId = String(workspaceCtx?.dataset.workspaceId || "").trim();
     if (!workspaceId) return;
 
     const initialJsonNode = document.getElementById("outline-initial-data");
@@ -1577,6 +1577,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const edgeBreakEl = event.target.closest(".outline-edge-breakpoint-hit, .outline-edge-breakpoint");
         if (edgeBreakEl) {
+            selectEdgeById(edgeBreakEl.dataset.edgeId);
             event.preventDefault();
             event.stopPropagation();
             return;
@@ -1748,6 +1749,7 @@ document.addEventListener("DOMContentLoaded", () => {
     edgeLayer.addEventListener("pointerdown", (event) => {
         const breakDot = event.target.closest(".outline-edge-breakpoint-hit, .outline-edge-breakpoint");
         if (!breakDot) return;
+        selectEdgeById(breakDot.dataset.edgeId);
         event.preventDefault();
         event.stopPropagation();
         if (event.detail >= 2) {

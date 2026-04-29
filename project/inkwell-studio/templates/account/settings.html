@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}账户设置 - Bedrock{% endblock %}
+
+{% block content %}
+<section class="card card-wide">
+    <h1>账户设置</h1>
+    <form id="account-settings-form" class="stack-form">
+        <label>
+            <span class="label-text">用户名</span>
+            <input type="text" id="account-username" value="{{ user_obj.username }}" maxlength="30" required />
+        </label>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+            <button type="submit" class="button primary">保存修改</button>
+            <button type="button" class="button neutral" id="account-cancel">取消</button>
+        </div>
+        <p id="account-settings-message" class="form-message"></p>
+    </form>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('account-settings-form');
+    const input = document.getElementById('account-username');
+    const msg = document.getElementById('account-settings-message');
+    const cancel = document.getElementById('account-cancel');
+
+    cancel.addEventListener('click', (e) => { e.preventDefault(); window.location.href = '/dashboard/'; });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        msg.textContent = '';
+        const next = (input.value || '').trim();
+        if (!next) { msg.textContent = '用户名不能为空'; return; }
+
+        try {
+            const resp = await fetchWithAuthRetry('/api/auth/me/', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: next }),
+            });
+
+            if (!resp.ok) {
+                const payload = await resp.json().catch(() => ({}));
+                msg.textContent = (payload.detail || payload.message || '保存失败');
+                return;
+            }
+
+            const updated = await resp.json();
+            // update cached user if present
+            try { setCachedUser(localStorage.getItem('bedrock_access'), updated); } catch {}
+            msg.textContent = '已保存';
+            setTimeout(() => { window.location.href = `/u/${encodeURIComponent(updated.username)}/`; }, 700);
+        } catch (err) {
+            console.error(err);
+            msg.textContent = '网络或服务器错误';
+        }
+    });
+});
+</script>
+
+{% endblock %}

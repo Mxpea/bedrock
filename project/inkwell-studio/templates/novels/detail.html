@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ novel.title|default:"工作区详情" }} - Bedrock{% endblock %}
+
+{% block content %}
+<section class="card card-wide workspace-hero">
+    <div style="display: flex; gap: 24px; align-items: stretch;">
+        {% if novel.cover_image %}
+        <img src="{{ novel.cover_image.url }}" alt="{{ novel.title }}" style="width: 140px; height: 180px; object-fit: cover; border-radius: 12px; border: 1px solid var(--line);">
+        {% else %}
+        <div style="width: 140px; height: 180px; background: var(--bg-soft); border-radius: 12px; border: 1px solid var(--line); display: grid; place-items: center; color: var(--muted);">封面缺失</div>
+        {% endif %}
+        <div>
+            <h1 style="margin: 0 0 12px; font-size: 2rem;">{{ novel.title }}</h1>
+            <p style="margin: 0 0 8px; color: var(--muted);">作者：<a href="/u/{{ novel.author.username }}/" style="color: var(--accent-strong); text-decoration: none;">{{ novel.author.username }}</a></p>
+            <p style="margin: 0 0 16px; font-size: 0.95rem; line-height: 1.6; max-width: 600px;">{{ novel.summary|default:"暂无简介"|linebreaksbr }}</p>
+            
+            <div style="display: flex; gap: 12px;">
+                {% if chapter_list %}
+                <a href="/reader/{{ chapter_list.0.id }}/" class="button primary">开始阅读</a>
+                {% else %}
+                <button class="button primary disabled" disabled>暂无章节</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="feature-grid" style="margin-top: 24px; grid-template-columns: 1fr;">
+    <article class="card">
+        <h2 style="margin-bottom: 20px;">章节目录 <span style="font-size: 0.9rem; color: var(--muted); font-weight: normal; margin-left: 8px;">共 {{ chapter_list|length }} 章</span></h2>
+        
+        {% if chapter_list %}
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">
+            {% for chapter in chapter_list %}
+            <a href="/reader/{{ chapter.id }}/" style="padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; text-decoration: none; color: var(--text); background: var(--surface-bg); transition: all 0.2s;" onmouseover="this.style.background='var(--line)'; this.style.borderColor='var(--accent-strong)';" onmouseout="this.style.background='var(--surface-bg)'; this.style.borderColor='var(--line)';">
+                <div style="font-size: 0.85rem; color: var(--muted); margin-bottom: 4px;">第 {{ chapter.order }} 章</div>
+                <div style="font-weight: 600;">{{ chapter.title }}</div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div style="padding: 40px; text-align: center; color: var(--muted); background: var(--bg-soft); border-radius: 12px; border: 1px solid var(--line);">
+            此工作区目前没有可公开访问的章节。
+        </div>
+        {% endif %}
+    </article>
+</section>
+
+{% endblock %}

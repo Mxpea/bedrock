@@ -7,9 +7,11 @@ from rest_framework.routers import DefaultRouter
 from config.views import (
     AuthorProfilePageView,
     DashboardPageView,
+    AccountSettingsPageView,
     HomePageView,
     LoginPageView,
     NovelListPageView,
+    NovelDetailPageView,
     ReaderPageView,
     RegisterPageView,
     WorkspacePageView,
@@ -17,6 +19,7 @@ from config.views import (
 from apps.novels.views import ChapterViewSet, NovelViewSet, CharacterViewSet, WorldviewEntryViewSet
 
 router = DefaultRouter()
+router.register(r"workspaces", NovelViewSet, basename="workspace")
 router.register(r"novels", NovelViewSet, basename="novel")
 router.register(r"chapters", ChapterViewSet, basename="chapter")
 router.register(r"characters", CharacterViewSet, basename="character")
@@ -27,9 +30,11 @@ urlpatterns = [
     path("login/", LoginPageView.as_view(), name="login-page"),
     path("register/", RegisterPageView.as_view(), name="register-page"),
     path("dashboard/", DashboardPageView.as_view(), name="dashboard-page"),
+    path("settings/", AccountSettingsPageView.as_view(), name="account-settings"),
     path("workspace/<str:workspace_id>/", WorkspacePageView.as_view(), name="workspace-page"),
     path("workspace/<str:workspace_id>/<str:module>/", WorkspacePageView.as_view(), name="workspace-module-page"),
     path("novels/", NovelListPageView.as_view(), name="novels-page"),
+    path("novel/<str:novel_id>/", NovelDetailPageView.as_view(), name="novel-detail-page"),
     path("reader/", ReaderPageView.as_view(), name="reader-page"),
     path("reader/<int:chapter_id>/", ReaderPageView.as_view(), name="reader-chapter-page"),
     path("u/<str:username>/", AuthorProfilePageView.as_view(), name="author-profile-page"),

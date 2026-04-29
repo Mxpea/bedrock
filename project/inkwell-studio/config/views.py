@@ -29,6 +29,15 @@ class DashboardPageView(TemplateView):
     template_name = "dashboard/index.html"
 
 
+class AccountSettingsPageView(LoginRequiredMixin, TemplateView):
+    template_name = "account/settings.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({"user_obj": self.request.user})
+        return context
+
+
 class NovelListPageView(TemplateView):
     template_name = "novels/list.html"
 
@@ -41,11 +50,11 @@ class WorkspacePageView(LoginRequiredMixin, TemplateView):
         workspace_id = kwargs.get("workspace_id")
         module = kwargs.get("module") or Novel.Module.WRITING
 
-        workspace = get_object_or_404(
-            Novel,
-            models.Q(public_id=workspace_id) | models.Q(id=workspace_id),
-            is_deleted=False,
-        )
+        workspace_filter = models.Q(public_id=workspace_id)
+        if str(workspace_id).isdigit():
+            workspace_filter |= models.Q(id=workspace_id)
+
+        workspace = get_object_or_404(Novel, workspace_filter, is_deleted=False)
         if workspace.author != self.request.user:
             raise Http404("你无权访问该工作区")
 
@@ -136,9 +145,10 @@ class ReaderPageView(TemplateView):
         if chapter_id:
             chapter = chapter_qs.filter(id=chapter_id).first()
         elif workspace_id:
-            chapter = chapter_qs.filter(
-                models.Q(novel_id=workspace_id) | models.Q(novel__public_id=workspace_id)
-            ).order_by("order", "id").first()
+            chapter_filter = models.Q(novel__public_id=workspace_id)
+            if str(workspace_id).isdigit():
+                chapter_filter |= models.Q(novel_id=workspace_id)
+            chapter = chapter_qs.filter(chapter_filter).order_by("order", "id").first()
         else:
             chapter = chapter_qs.order_by("-updated_at").first()
 
@@ -281,4 +291,37 @@ class AuthorProfilePageView(TemplateView):
             "homepage_modules_payload": self._serialize_workspaces(public_workspaces.order_by("-updated_at")),
             "homepage_timeline_payload": self._serialize_timeline(timeline_qs),
         })
+        return context
+
+
+class NovelDetailPageView(TemplateView):
+    template_name = "novels/detail.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        workspace_id = kwargs.get("novel_id")
+        
+        # Check permissions similar to reader
+        user = self.request.user
+        base_qs = Novel.objects.filter(is_deleted=False)
+        
+        novel_filter = models.Q(public_id=workspace_id)
+        if str(workspace_id).isdigit():
+            novel_filter |= models.Q(id=workspace_id)
+            
+        novel = get_object_or_404(base_qs, novel_filter)
+        
+        # Ensure user can see this novel
+        if not (user.is_authenticated and (user.is_staff or user.is_superuser or novel.author == user)):
+            if novel.visibility not in [Novel.Visibility.PUBLIC, Novel.Visibility.LINK]:
+                raise Http404("无权访问该工作区")
+                
+        context["novel"] = novel
+        
+        # Get accessible chapters
+        chap_base = novel.chapters.all()
+        if not (user.is_authenticated and (user.is_staff or user.is_superuser or novel.author == user)):
+            chap_base = chap_base.filter(is_published=True)
+            
+        context["chapter_list"] = chap_base.order_by("order", "id")
         return context
