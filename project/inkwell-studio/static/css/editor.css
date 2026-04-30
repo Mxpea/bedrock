@@ -226,15 +226,7 @@
     z-index: 2;
 }
 
-.editor-panel-head .icon-btn.small {
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-}
+
 
 .editor-workspace.is-chapters-collapsed .editor-left-panel .editor-panel-head {
     justify-content: center;
@@ -641,3 +633,4 @@ body.dark-mode .chapter-content-input::placeholder { color: rgba(255, 255, 255, 
         min-height: 32vh;
     }
 }
+

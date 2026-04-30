@@ -79,19 +79,19 @@
 
                 <div id="wv-md-toolbar" class="worldview-v2-md-toolbar" hidden>
                     <div class="worldview-v2-md-tools">
-                        <button type="button" class="button secondary" id="wv-md-h1">H1</button>
-                        <button type="button" class="button secondary" id="wv-md-bold">加粗</button>
-                        <button type="button" class="button secondary" id="wv-md-italic">斜体</button>
-                        <button type="button" class="button secondary" id="wv-md-list">列表</button>
-                        <button type="button" class="button secondary" id="wv-md-quote">引用</button>
-                        <button type="button" class="button secondary" id="wv-md-code">代码</button>
+                        <button type="button" class="tool-btn txt-icon" id="wv-md-h1">H1</button>
+                        <button type="button" class="tool-btn txt-icon" id="wv-md-bold"><i class="ph ph-text-b"></i></button>
+                        <button type="button" class="tool-btn txt-icon" id="wv-md-italic"><i class="ph ph-text-italic"></i></button>
+                        <button type="button" class="tool-btn txt-icon" id="wv-md-list"><i class="ph ph-list-bullets"></i></button>
+                        <button type="button" class="tool-btn txt-icon" id="wv-md-quote"><i class="ph ph-quotes"></i></button>
+                        <button type="button" class="tool-btn txt-icon" id="wv-md-code"><i class="ph ph-code"></i></button>
                     </div>
                     <div class="worldview-v2-md-tools">
                         <select id="wv-link-target" class="worldview-v2-md-select"></select>
-                        <button type="button" class="button secondary" id="wv-insert-link">快速内部链接</button>
+                        <button type="button" class="tool-btn syntax-custom" id="wv-insert-link">+内链</button>
                         <select id="wv-backlink-target" class="worldview-v2-md-select"></select>
-                        <button type="button" class="button secondary" id="wv-insert-backlink">快速反向链接</button>
-                        <button type="button" class="button secondary" id="wv-upload-image">上传图片</button>
+                        <button type="button" class="tool-btn syntax-custom" id="wv-insert-backlink">+反链</button>
+                        <button type="button" class="tool-btn txt-icon" id="wv-upload-image"><i class="ph ph-image"></i></button>
                         <input id="wv-image-input" type="file" accept="image/*" hidden>
                     </div>
                 </div>
@@ -725,4 +725,7 @@
     }
 }
 </style>
+
+
+
 

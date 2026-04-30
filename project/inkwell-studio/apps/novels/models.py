@@ -1,7 +1,8 @@
-from django.conf import settings
-from django.db import models
 import re
 import uuid
+
+from django.conf import settings
+from django.db import models
 
 from apps.customization.markdown_extensions import sanitize_advanced_content, sanitize_standard_content
 from apps.customization.models import AdvancedStyleGrant
@@ -81,17 +82,11 @@ class Chapter(TimeStampedModel):
         ).exists()
 
     def save(self, *args, **kwargs):
-        # Only re-render content_html when content_md has actually changed.
-        # This avoids an expensive Markdown render + AdvancedStyleGrant query
-        # on every save (e.g. publishing, reordering).
-        update_fields = kwargs.get("update_fields")
-        if update_fields is None or "content_md" in update_fields:
-            if self._author_has_advanced_markdown_access():
-                self.content_html = sanitize_advanced_content(self.content_md)
-            else:
-                self.content_html = sanitize_standard_content(self.content_md)
-            if update_fields is not None and "content_html" not in update_fields:
-                kwargs["update_fields"] = list(update_fields) + ["content_html"]
+        # Standard authors use strict token rendering; advanced authors get limited HTML tags.
+        if self._author_has_advanced_markdown_access():
+            self.content_html = sanitize_advanced_content(self.content_md)
+        else:
+            self.content_html = sanitize_standard_content(self.content_md)
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
@@ -122,6 +117,40 @@ class Character(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.novel.title}-{self.name}"
+
+    def compute_chapter_mentions(self):
+        token_pat = re.compile(r"\{\s*@?人物\s*:\s*([^}]+?)\s*\}")
+        at_pat = re.compile(r"(?<![\w\u4e00-\u9fa5])@([\u4e00-\u9fa5A-Za-z0-9_\-]{2,40})")
+
+        names = {self.name.strip()}
+        names.update([str(alias).strip() for alias in (self.aliases or []) if str(alias).strip()])
+
+        hits = []
+        for chapter in self.novel.chapters.all().order_by("order", "id"):  # type: ignore[attr-defined]
+            text = chapter.content_md or ""
+            matched = False
+
+            for token_name in token_pat.findall(text):
+                if token_name.strip() in names:
+                    matched = True
+                    break
+
+            if not matched:
+                for at_name in at_pat.findall(text):
+                    if at_name.strip() in names:
+                        matched = True
+                        break
+
+            if matched:
+                hits.append(
+                    {
+                        "chapter_id": chapter.id,
+                        "chapter_title": chapter.title,
+                        "chapter_order": chapter.order,
+                    }
+                )
+
+        return hits
 
 
 class WorldviewEntry(TimeStampedModel):

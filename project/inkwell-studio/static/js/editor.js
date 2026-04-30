@@ -522,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
             editorRightPanel.classList.toggle('collapsed');
             const collapsed = editorRightPanel.classList.contains('collapsed');
             btnToggleSide.title = collapsed ? '展开辅助面板' : '收起辅助面板';
-            btnToggleSide.textContent = collapsed ? '◀' : '▶';
+            btnToggleSide.innerHTML = collapsed ? '<i class="ph ph-caret-left"></i>' : '<i class="ph ph-caret-right"></i>';
         });
     }
 
@@ -531,7 +531,7 @@ document.addEventListener('DOMContentLoaded', () => {
             editorWorkspace.classList.toggle('is-chapters-collapsed');
             const collapsed = editorWorkspace.classList.contains('is-chapters-collapsed');
             btnToggleChapters.title = collapsed ? '展开章节栏' : '折叠章节栏';
-            btnToggleChapters.textContent = collapsed ? '▶' : '◀';
+            btnToggleChapters.innerHTML = collapsed ? '<i class="ph ph-caret-right"></i>' : '<i class="ph ph-caret-left"></i>';
         });
     }
 
@@ -540,7 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
             workspaceShell.classList.toggle('is-workspace-sidebar-collapsed');
             const collapsed = workspaceShell.classList.contains('is-workspace-sidebar-collapsed');
             btnToggleWorkspaceNav.title = collapsed ? '展开工作区导航' : '折叠工作区导航';
-            btnToggleWorkspaceNav.textContent = collapsed ? '▶' : '◀';
+            btnToggleWorkspaceNav.innerHTML = collapsed ? '<i class="ph ph-caret-right"></i>' : '<i class="ph ph-caret-left"></i>';
         });
     }
 
@@ -549,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
             editorCanvas.classList.toggle('preview-hidden');
             const hidden = editorCanvas.classList.contains('preview-hidden');
             btnToggleLivePreview.title = hidden ? '显示实时预览' : '隐藏实时预览';
-            btnToggleLivePreview.textContent = hidden ? '◀' : '▶';
+            btnToggleLivePreview.innerHTML = hidden ? '<i class="ph ph-caret-left"></i>' : '<i class="ph ph-caret-right"></i>';
         });
     }
 
@@ -958,3 +958,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 });
+

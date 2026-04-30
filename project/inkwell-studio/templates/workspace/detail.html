@@ -16,7 +16,7 @@
                 {% endif %}
             </div>
             <h2 class="workspace-name">{{ workspace.title }}</h2>
-            <button type="button" class="layout-toggle-btn compact" id="btn-toggle-workspace-nav" title="收起工作区导航">◀</button>
+            <button type="button" class="layout-toggle-btn compact" id="btn-toggle-workspace-nav" title="收起工作区导航"><i class="ph ph-caret-left"></i></button>
         </div>
         <div class="workspace-sidebar-body">
             <details class="workspace-group-fold" open>
@@ -264,12 +264,12 @@
             <aside id="char-drawer" class="character-drawer" hidden>
                 <header class="character-drawer-head">
                     <div>
-                        <button type="button" id="char-drawer-close-left" class="icon-btn small" title="返回">←</button>
+                        <button type="button" id="char-drawer-close-left" class="layout-toggle-btn compact" title="返回">←</button>
                         <span id="char-drawer-title">人物档案</span>
                     </div>
                     <div class="character-drawer-head-actions">
-                        <button type="button" id="char-drawer-star" class="icon-btn small" title="星标">★</button>
-                        <button type="button" id="char-drawer-close" class="icon-btn small" title="关闭">×</button>
+                        <button type="button" id="char-drawer-star" class="layout-toggle-btn compact" title="星标">★</button>
+                        <button type="button" id="char-drawer-close" class="layout-toggle-btn compact" title="关闭">×</button>
                     </div>
                 </header>
                 <form id="char-form" class="stack-form character-drawer-body">
@@ -330,10 +330,10 @@
             </aside>
 
             <div id="char-context-menu" class="character-context-menu" hidden>
-                <button type="button" data-action="edit">编辑</button>
-                <button type="button" data-action="copy">复制关联链接</button>
-                <button type="button" data-action="pin">置顶/取消置顶</button>
-                <button type="button" data-action="delete" class="danger">删除</button>
+                <button type="button" class="button secondary" data-action="edit">编辑</button>
+                <button type="button" class="button secondary" data-action="copy">复制关联链接</button>
+                <button type="button" class="button secondary" data-action="pin">置顶/取消置顶</button>
+                <button type="button" class="button secondary danger" data-action="delete">删除</button>
             </div>
 
             <div id="char-md-modal" class="character-md-modal" hidden>
@@ -341,22 +341,22 @@
                 <section class="character-md-dialog" role="dialog" aria-modal="true" aria-label="外貌与性格描述编辑器">
                     <header class="character-md-header">
                         <h3>外貌与性格描述 · Markdown 编辑器</h3>
-                        <button type="button" id="char-md-close" class="icon-btn small" title="关闭">×</button>
+                        <button type="button" id="char-md-close" class="layout-toggle-btn compact" title="关闭">×</button>
                     </header>
 
                     <div class="character-md-toolbar">
                         <div class="character-md-mode-switch">
-                            <button type="button" class="active" data-md-mode="split">分栏</button>
-                            <button type="button" data-md-mode="edit">编辑</button>
-                            <button type="button" data-md-mode="preview">预览</button>
+                            <button type="button" class="button secondary active" data-md-mode="split">分栏</button>
+                            <button type="button" class="button secondary" data-md-mode="edit">编辑</button>
+                            <button type="button" class="button secondary" data-md-mode="preview">预览</button>
                         </div>
                         <div class="character-md-insert-tools">
-                            <button type="button" data-md-wrap="**|**" title="加粗">B</button>
-                            <button type="button" data-md-wrap="*|*" title="斜体">I</button>
-                            <button type="button" data-md-prefix="## " title="二级标题">H2</button>
-                            <button type="button" data-md-prefix="> " title="引用">❝</button>
-                            <button type="button" data-md-prefix="- " title="列表">•</button>
-                            <button type="button" data-md-wrap="[文本](|)" title="链接">🔗</button>
+                            <button type="button" class="tool-btn txt-icon" data-md-wrap="**|**" title="加粗"><i class="ph ph-text-b"></i></button>
+                            <button type="button" class="tool-btn txt-icon" data-md-wrap="*|*" title="斜体"><i class="ph ph-text-italic"></i></button>
+                            <button type="button" class="tool-btn txt-icon" data-md-prefix="## " title="二级标题">H2</button>
+                            <button type="button" class="tool-btn txt-icon" data-md-prefix="> " title="引用"><i class="ph ph-quotes"></i></button>
+                            <button type="button" class="tool-btn txt-icon" data-md-prefix="- " title="列表"><i class="ph ph-list-bullets"></i></button>
+                            <button type="button" class="tool-btn txt-icon" data-md-wrap="[文本](|)" title="链接"><i class="ph ph-link"></i></button>
                         </div>
                     </div>
 
@@ -971,9 +971,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p class="character-role">${item.role_title || item.summary || '未填写身份'}</p>
                 <p class="character-meta">出场：${item.appearances_count || 0} 章</p>
                 <div class="character-quick-actions">
-                    <button type="button" data-action="edit">📝 编辑</button>
-                    <button type="button" data-action="copy">🔗 复制链接</button>
-                    <button type="button" data-action="delete" class="danger">🗑️ 删除</button>
+                    <button type="button" class="button secondary small" data-action="edit">编辑</button>
+                    <button type="button" class="button secondary small" data-action="copy">复制链接</button>
+                    <button type="button" class="button secondary small danger" data-action="delete">删除</button>
                 </div>
             </article>
         `).join('');
@@ -1733,3 +1733,9 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 {% endif %}
 {% endblock %}
+
+
+
+
+
+
