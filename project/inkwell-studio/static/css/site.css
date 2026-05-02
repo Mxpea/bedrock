@@ -1,3 +1,11 @@
+@font-face {
+    font-family: "Material Symbols Rounded";
+    src: url("../fonts/material-symbols-rounded.ttf") format("truetype");
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+}
+
 :root {
     color-scheme: light;
     --bg: #f5f1e8;
@@ -599,14 +607,38 @@ body.dark-mode .secondary {
     object-fit: cover;
 }
 
-/* Fallback glyphs for Phosphor icons when the icon font fails to load.
-   These provide simple Unicode alternatives for critical toolbar icons. */
+/* Google Material Symbols (Apache-2.0) with Microsoft glyph fallback fonts. */
+.ms-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1em;
+    height: 1em;
+    line-height: 1;
+    font-family: "Material Symbols Rounded", "Segoe Fluent Icons", "Segoe MDL2 Assets", "Segoe UI Symbol", sans-serif;
+    font-weight: normal;
+    font-style: normal;
+    font-size: 1.1em;
+    text-rendering: optimizeLegibility;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    direction: ltr;
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.ms-icon.filled {
+    font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Legacy ph fallback, retained for untouched templates. */
 .ph { display: inline-block; width: 1em; height: 1em; line-height: 1; text-align: center; }
 .ph.ph-text-b::before { content: 'B'; font-weight: 800; }
 .ph.ph-text-italic::before { content: 'I'; font-style: italic; }
 .ph.ph-text-strikethrough::before { content: 'S'; text-decoration: line-through; }
 .ph.ph-link::before { content: '🔗'; }
-.ph.ph-image::before { content: '🖼️'; }
+.ph.ph-image::before { content: '🖼'; }
 .ph.ph-at::before { content: '@'; }
 .ph.ph-file-arrow-up::before { content: '↑'; }
 .ph.ph-caret-left::before { content: '◀'; }
@@ -616,8 +648,6 @@ body.dark-mode .secondary {
 .ph.ph-list-bullets::before { content: '•'; }
 .ph.ph-quotes::before { content: '"'; }
 .ph.ph-info::before { content: 'i'; font-weight:700; }
-
-/* end fallback icons */
 
 .workspace-sidebar-head #btn-toggle-workspace-nav {
     width: 34px;
