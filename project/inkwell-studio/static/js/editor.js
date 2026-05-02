@@ -720,7 +720,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const getNextChapterOrder = async (novelId, token) => {
         if (!novelId || !token) return 1;
         try {
-            const response = await fetch(`/api/chapters/?novel=${novelId}&ordering=order`, {
+            // ask for a large page_size to reduce chance of incomplete list
+            const response = await fetch(`/api/chapters/?novel=${novelId}&ordering=order&page_size=1000`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!response.ok) return 1;
@@ -820,24 +821,57 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const url = currentChapterId ? `/api/chapters/${currentChapterId}/` : '/api/chapters/';
             const method = currentChapterId ? 'PUT' : 'POST';
+
             if (!currentChapterId) {
                 payload.order = await getNextChapterOrder(currentNovelId, token);
             }
-            
+
             const headers = {
                 'Content-Type': 'application/json'
             };
             if (token) headers.Authorization = `Bearer ${token}`;
             if (csrftoken) headers['X-CSRFToken'] = csrftoken;
 
-            const res = await fetch(url, {
-                method,
-                credentials: 'same-origin',
-                headers,
-                body: JSON.stringify(payload)
-            });
+            // Try to create; if unique constraint on (novel, order) fires,
+            // increment order and retry a few times to avoid race conditions.
+            let attempts = 0;
+            let lastRes = null;
+            while (attempts < 5) {
+                lastRes = await fetch(url, {
+                    method,
+                    credentials: 'same-origin',
+                    headers,
+                    body: JSON.stringify(payload)
+                });
 
-            if (res.ok) {
+                if (lastRes.ok) break;
+
+                // If validation error mentions novel/order uniqueness, bump order and retry
+                let retry = false;
+                try {
+                    const errBody = await lastRes.json();
+                    const nf = errBody.non_field_errors || errBody.errors || errBody.detail;
+                    const nfStr = JSON.stringify(nf || errBody).toLowerCase();
+                    if (nfStr.includes('novel') && nfStr.includes('order') && nfStr.includes('唯一')) {
+                        retry = true;
+                    }
+                    // Some APIs return english message
+                    if (nfStr.includes('novel') && nfStr.includes('order') && (nfStr.includes('unique') || nfStr.includes('unique together'))) {
+                        retry = true;
+                    }
+                } catch (e) {
+                    // can't parse body; no retry
+                }
+
+                if (!retry) break;
+
+                // bump order and retry
+                payload.order = (Number(payload.order) || 0) + 1;
+                attempts += 1;
+            }
+
+            const res = lastRes;
+            if (res && res.ok) {
                 const data = await res.json();
                 if (!currentChapterId) {
                     currentChapterId = data.id;
@@ -849,11 +883,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 await loadChapterList(currentNovelId);
             } else {
                 let detail = '保存失败';
-                try {
-                    const errBody = await res.json();
-                    detail = errBody.detail || errBody.message || JSON.stringify(errBody);
-                } catch (e) {
-                    try { detail = await res.text(); } catch { /* ignore */ }
+                if (res) {
+                    try {
+                        const errBody = await res.json();
+                        detail = errBody.detail || errBody.message || JSON.stringify(errBody);
+                    } catch (e) {
+                        try { detail = await res.text(); } catch { /* ignore */ }
+                    }
                 }
                 saveStatus.textContent = detail;
             }
