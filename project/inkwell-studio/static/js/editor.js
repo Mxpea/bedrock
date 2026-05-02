@@ -824,15 +824,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 payload.order = await getNextChapterOrder(currentNovelId, token);
             }
             
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (token) headers.Authorization = `Bearer ${token}`;
+            if (csrftoken) headers['X-CSRFToken'] = csrftoken;
+
             const res = await fetch(url, {
                 method,
-                headers: { 
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
+                credentials: 'same-origin',
+                headers,
                 body: JSON.stringify(payload)
             });
-            
+
             if (res.ok) {
                 const data = await res.json();
                 if (!currentChapterId) {
@@ -844,7 +848,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (breadcrumb) breadcrumb.textContent = `工作区 ${data.workspace_name || '#' + data.novel} / ${data.title}`;
                 await loadChapterList(currentNovelId);
             } else {
-                saveStatus.textContent = '保存失败';
+                let detail = '保存失败';
+                try {
+                    const errBody = await res.json();
+                    detail = errBody.detail || errBody.message || JSON.stringify(errBody);
+                } catch (e) {
+                    try { detail = await res.text(); } catch { /* ignore */ }
+                }
+                saveStatus.textContent = detail;
             }
         } catch (err) {
             saveStatus.textContent = '网络错误';

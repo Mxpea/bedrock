@@ -599,6 +599,26 @@ body.dark-mode .secondary {
     object-fit: cover;
 }
 
+/* Fallback glyphs for Phosphor icons when the icon font fails to load.
+   These provide simple Unicode alternatives for critical toolbar icons. */
+.ph { display: inline-block; width: 1em; height: 1em; line-height: 1; text-align: center; }
+.ph.ph-text-b::before { content: 'B'; font-weight: 800; }
+.ph.ph-text-italic::before { content: 'I'; font-style: italic; }
+.ph.ph-text-strikethrough::before { content: 'S'; text-decoration: line-through; }
+.ph.ph-link::before { content: '🔗'; }
+.ph.ph-image::before { content: '🖼️'; }
+.ph.ph-at::before { content: '@'; }
+.ph.ph-file-arrow-up::before { content: '↑'; }
+.ph.ph-caret-left::before { content: '◀'; }
+.ph.ph-caret-right::before { content: '▶'; }
+.ph.ph-caret-down::before { content: '▾'; }
+.ph.ph-caret-up::before { content: '▴'; }
+.ph.ph-list-bullets::before { content: '•'; }
+.ph.ph-quotes::before { content: '"'; }
+.ph.ph-info::before { content: 'i'; font-weight:700; }
+
+/* end fallback icons */
+
 .workspace-sidebar-head #btn-toggle-workspace-nav {
     width: 34px;
     height: 34px;
