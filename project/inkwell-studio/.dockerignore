@@ -1,0 +1,63 @@
+# Python virtualenvs
+.venv/
+env/
+venv/
+ENV/
+pip-wheel-metadata/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Django
+media/
+staticfiles/
+staticfiles_root/
+*.log
+*.pot
+
+# System
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Environment files (do NOT include in image)
+.env
+.env.*.local
+.env.local
+
+# Docker / compose overrides for local dev
+docker-compose.override.yml
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Tests / coverage
+.coverage
+htmlcov/
+.tox/
+
+# Misc
+*.pyc
+__pycache__
+*.sqlite3
+celerybeat-schedule
+*.pid
