@@ -441,7 +441,7 @@
                     renderGuideRails(ancestorHasNext) +
                     '<div class="worldview-v2-tree-folder-row">' +
                     '<button type="button" class="worldview-v2-folder-toggle" data-toggle-folder="' + escapeHtml(node.path) + '">' +
-                    (hasChildren ? (isCollapsed ? '<i class="ph ph-caret-right"></i>' : '<i class="ph ph-caret-down"></i>') : '<i class="ph ph-dot-outline"></i>') +
+                    (hasChildren ? (isCollapsed ? '▸' : '▾') : '•') +
                     '</button>' +
                     '<button type="button" class="worldview-v2-folder-node' + isActive + '" data-folder="' + escapeHtml(node.path) + '" data-drop-folder="' + escapeHtml(node.path) + '">📁 ' + escapeHtml(node.name) + '</button>' +
                     '</div>' +

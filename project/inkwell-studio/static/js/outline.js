@@ -1357,7 +1357,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function toggleSidepanel() {
         sidepanelEl.hidden = !sidepanelEl.hidden;
         sidepanelToggleBtn.title = sidepanelEl.hidden ? "展开工具栏" : "收起工具栏";
-        sidepanelToggleBtn.innerHTML = sidepanelEl.hidden ? '<i class="ph ph-caret-left"></i>' : '<i class="ph ph-caret-right"></i>';
+        sidepanelToggleBtn.textContent = sidepanelEl.hidden ? '◀' : '▶';
         layoutEl.classList.toggle("is-sidepanel-collapsed", sidepanelEl.hidden);
     }
 
