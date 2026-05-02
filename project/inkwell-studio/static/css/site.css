@@ -2558,11 +2558,11 @@ body.topbar-collapsed .page-shell:has(.workspace-shell-writing) {
 }
 
 /* Left Sidebar logic for Writing */
-.workspace-shell.workspace-shell-writing.is-workspace-sidebar-collapsed {
+.workspace-shell.is-workspace-sidebar-collapsed {
     grid-template-columns: 42px minmax(0, 1fr);
 }
 
-.workspace-shell.workspace-shell-writing.is-workspace-sidebar-collapsed .workspace-sidebar {
+.workspace-shell.is-workspace-sidebar-collapsed .workspace-sidebar {
     padding: 0;
     width: 42px;
     min-width: 0;
@@ -2570,25 +2570,25 @@ body.topbar-collapsed .page-shell:has(.workspace-shell-writing) {
     overflow: hidden;
 }
 
-.workspace-shell.workspace-shell-writing.is-workspace-sidebar-collapsed .workspace-sidebar-body {
+.workspace-shell.is-workspace-sidebar-collapsed .workspace-sidebar-body {
     opacity: 0;
     transform: translateX(-8px);
     pointer-events: none;
     visibility: hidden;
 }
 
-.workspace-shell.workspace-shell-writing.is-workspace-sidebar-collapsed .workspace-sidebar-head {
+.workspace-shell.is-workspace-sidebar-collapsed .workspace-sidebar-head {
     justify-content: center;
     padding: 6px;
     gap: 0;
 }
 
-.workspace-shell.workspace-shell-writing.is-workspace-sidebar-collapsed .workspace-sidebar-head .workspace-sidebar-icon,
-.workspace-shell.workspace-shell-writing.is-workspace-sidebar-collapsed .workspace-sidebar-head .workspace-name {
+.workspace-shell.is-workspace-sidebar-collapsed .workspace-sidebar-head .workspace-sidebar-icon,
+.workspace-shell.is-workspace-sidebar-collapsed .workspace-sidebar-head .workspace-name {
     display: none;
 }
 
-.workspace-shell.workspace-shell-writing.is-workspace-sidebar-collapsed .workspace-sidebar-head #btn-toggle-workspace-nav {
+.workspace-shell.is-workspace-sidebar-collapsed .workspace-sidebar-head #btn-toggle-workspace-nav {
     margin: 0;
 }
 
@@ -2732,3 +2732,4 @@ body.topbar-collapsed .workspace-shell.workspace-shell-worldbuilding .workspace-
         grid-template-rows: auto;
     }
 }
+
