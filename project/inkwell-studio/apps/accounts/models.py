@@ -2,6 +2,8 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 from apps.core.models import TimeStampedModel
+import hashlib
+import secrets
 
 
 class User(AbstractUser):
@@ -13,6 +15,32 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=16, choices=Role.choices, default=Role.AUTHOR)
     custom_level = models.PositiveSmallIntegerField(default=1)
+    # Two-factor authentication (TOTP)
+    two_factor_enabled = models.BooleanField(default=False)
+    two_factor_secret = models.CharField(max_length=128, null=True, blank=True)
+    # JSON list of hashed one-time recovery codes (stored as sha256 hex digests)
+    two_factor_recovery_codes = models.JSONField(default=list, blank=True)
+
+    def generate_recovery_codes(self, count: int = 10) -> list:
+        codes = []
+        hashed = []
+        for _ in range(count):
+            code = secrets.token_urlsafe(8)
+            codes.append(code)
+            hashed.append(hashlib.sha256(code.encode()).hexdigest())
+        self.two_factor_recovery_codes = hashed
+        self.save(update_fields=["two_factor_recovery_codes"])
+        return codes
+
+    def verify_and_consume_recovery_code(self, code: str) -> bool:
+        h = hashlib.sha256(code.encode()).hexdigest()
+        if h in (self.two_factor_recovery_codes or []):
+            lst = list(self.two_factor_recovery_codes)
+            lst.remove(h)
+            self.two_factor_recovery_codes = lst
+            self.save(update_fields=["two_factor_recovery_codes"])
+            return True
+        return False
 
     REQUIRED_FIELDS = ["email"]
 

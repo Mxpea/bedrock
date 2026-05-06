@@ -22,4 +22,22 @@
         </form>
     </div>
 </section>
+
+<!-- 2FA Modal -->
+<dialog id="totpModal" class="modal">
+    <div class="modal-content">
+        <h2>两步验证</h2>
+        <p>该账号已开启两步验证，请输入验证器中的 6 位动态验证码或恢复代码：</p>
+        <form id="totpForm" class="stack-form">
+            <label>
+                <span>验证码 / 恢复代码</span>
+                <input type="text" name="otp_or_recovery" required autocomplete="one-time-code" placeholder="6 位验证码 或 恢复代码">
+            </label>
+            <div class="button-group" style="justify-content: flex-end; margin-top: 1rem;">
+                <button type="button" class="button secondary cancel-btn">取消</button>
+                <button type="submit" class="button primary">验证</button>
+            </div>
+        </form>
+    </div>
+</dialog>
 {% endblock %}

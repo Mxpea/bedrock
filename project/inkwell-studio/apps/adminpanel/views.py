@@ -286,8 +286,25 @@ class UserDetailAdminView(AdminRequiredMixin, TemplateView):
                 messages.success(request, "主页装修配置已重置")
             else:
                 messages.info(request, "该用户暂无主页配置")
-
             write_audit(request.user, "admin.user.reset_homepage", "user", user_obj.id, {"username": user_obj.username})
+
+        elif action == "reset_password":
+            new_password = request.POST.get("new_password")
+            if new_password and len(new_password) >= 6:
+                user_obj.set_password(new_password)
+                user_obj.save(update_fields=["password"])
+                messages.success(request, f"用户 {user_obj.username} 的密码已重置成功")
+                write_audit(request.user, "admin.user.reset_password", "user", user_obj.id, {"username": user_obj.username})
+            else:
+                messages.error(request, "密码重置失败：密码长度需至少为 6 位")
+
+        elif action == "disable_2fa":
+            user_obj.two_factor_enabled = False
+            user_obj.two_factor_secret = None
+            user_obj.two_factor_recovery_codes = []
+            user_obj.save(update_fields=["two_factor_enabled", "two_factor_secret", "two_factor_recovery_codes"])
+            messages.success(request, f"用户 {user_obj.username} 的两步验证已成功禁用")
+            write_audit(request.user, "admin.user.disable_2fa", "user", user_obj.id, {"username": user_obj.username})
 
         return redirect("adminpanel:user-detail", user_id=user_obj.id)
 

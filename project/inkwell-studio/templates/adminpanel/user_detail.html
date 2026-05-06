@@ -10,9 +10,38 @@
         <div>
             <h3 style="margin:0;">{{ target_user.username }}</h3>
             <p class="admin-muted">ID #{{ target_user.id }} · {{ target_user.email }} · 角色 {{ target_user.get_role_display }} · Lv.{{ target_user.custom_level }}</p>
+            <p class="admin-muted" style="margin-top: 4px;"><strong>2FA状态：</strong>
+                {% if target_user.two_factor_enabled %}<span style="color: var(--color-success)">已开启</span>{% else %}未开启{% endif %}
+            </p>
         </div>
         <form method="post" class="inline">{% csrf_token %}
             <button type="submit" name="action" value="reset_homepage" onclick="return confirm('确认重置该用户主页装修配置？')">重置主页装修</button>
+        </form>
+    </div>
+</section>
+
+<section class="admin-card">
+    <h3>账号安全管理</h3>
+    <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+        <form method="post" style="border: 1px solid var(--color-border); padding: 1rem; border-radius: 4px; flex: 1; min-width: 250px;">
+            {% csrf_token %}
+            <h4>重置密码</h4>
+            <div style="margin: 0.5rem 0;">
+                <input type="text" name="new_password" placeholder="输入新密码 (至少6位)" required minlength="6" style="width: 100%;">
+            </div>
+            <button type="submit" name="action" value="reset_password" onclick="return confirm('确定强制修改该用户的密码？')">确认重置密码</button>
+        </form>
+
+        <form method="post" style="border: 1px solid var(--color-border); padding: 1rem; border-radius: 4px; flex: 1; min-width: 250px; display: flex; flex-direction: column; justify-content: center;">
+            {% csrf_token %}
+            <h4>2FA 强制管理</h4>
+            {% if target_user.two_factor_enabled %}
+            <p class="admin-muted" style="margin: 0.5rem 0;">如果用户丢失了验证器，你可以强制为该账号关闭两步验证。</p>
+            <button type="submit" name="action" value="disable_2fa" onclick="return confirm('确认关闭该用户的强制两步验证吗？这会降低对方的账号安全！')">强制禁用 2FA</button>
+            {% else %}
+            <p class="admin-muted" style="margin: 0.5rem 0;">该账号目前未开启两步验证，无需执行重置。</p>
+            <button type="button" disabled>无需操作</button>
+            {% endif %}
         </form>
     </div>
 </section>

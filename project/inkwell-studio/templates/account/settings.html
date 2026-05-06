@@ -6,11 +6,47 @@
 {% block content %}
 <section class="card card-wide">
     <h1>账户设置</h1>
+    <section class="card card-narrow" style="margin-top:16px;">
+        <h2>两步验证（2FA）</h2>
+        <div id="twofa-area">
+            <p id="twofa-status">状态: <span id="twofa-enabled">{{ user_obj.two_factor_enabled|yesno:"已启用,未启用" }}</span></p>
+            {% if user_obj.two_factor_enabled %}
+            <button id="twofa-disable" class="button secondary">禁用 2FA</button>
+            {% else %}
+            <button id="twofa-setup" class="button">启用 2FA</button>
+            <div id="twofa-qr" style="margin-top:12px; display:none;">
+                <p>扫码添加到手机认证器：</p>
+                <img id="twofa-qr-img" src="" alt="QR code" />
+                <p>然后在下面输入验证码完成验证：</p>
+                <input id="twofa-code-input" placeholder="123456" />
+                <button id="twofa-verify" class="button primary">验证并启用</button>
+                <div id="twofa-recovery" style="margin-top:8px;display:none;">
+                    <p>请保存以下一次性恢复码（仅显示一次）：</p>
+                    <pre id="twofa-recovery-list"></pre>
+                </div>
+            </div>
+            {% endif %}
+            <p id="twofa-message" class="form-message"></p>
+        </div>
+    </section>
     <form id="account-settings-form" class="stack-form">
         <label>
             <span class="label-text">用户名</span>
             <input type="text" id="account-username" value="{{ user_obj.username }}" maxlength="30" required />
         </label>
+        <section style="margin-top:16px;">
+            <h2>修改密码</h2>
+            <label>
+                <span class="label-text">当前密码</span>
+                <input type="password" id="old-password" />
+            </label>
+            <label>
+                <span class="label-text">新密码</span>
+                <input type="password" id="new-password" />
+            </label>
+            <button type="button" id="change-password-btn" class="button primary">修改密码</button>
+            <p id="change-password-msg" class="form-message"></p>
+        </section>
         <div style="display:flex;gap:8px;margin-top:12px;">
             <button type="submit" class="button primary">保存修改</button>
             <button type="button" class="button neutral" id="account-cancel">取消</button>
@@ -59,5 +95,131 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 </script>
+
+<script>
+// 2FA setup/verify frontend
+document.addEventListener('DOMContentLoaded', () => {
+    const setupBtn = document.getElementById('twofa-setup');
+    const qrArea = document.getElementById('twofa-qr');
+    const qrImg = document.getElementById('twofa-qr-img');
+    const codeInput = document.getElementById('twofa-code-input');
+    const verifyBtn = document.getElementById('twofa-verify');
+    const msg = document.getElementById('twofa-message');
+    const recoveryBlock = document.getElementById('twofa-recovery');
+    const recoveryList = document.getElementById('twofa-recovery-list');
+    const disableBtn = document.getElementById('twofa-disable');
+
+    disableBtn && disableBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (!confirm("确定要禁用两步验证吗？这会降低账号安全性。")) return;
+        msg.textContent = '请求中...';
+        try {
+            const resp = await fetchWithAuthRetry('/api/auth/2fa/disable/', { method: 'POST' });
+            if (!resp.ok) { msg.textContent = '禁用失败'; return; }
+            msg.textContent = '2FA 已禁用，即将刷新页面';
+            setTimeout(() => { window.location.reload(); }, 1000);
+        } catch (err) {
+            console.error(err);
+            msg.textContent = '网络或服务器错误';
+        }
+    });
+
+    setupBtn && setupBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        msg.textContent = '';
+        try {
+            const resp = await fetchWithAuthRetry('/api/auth/2fa/setup/', { method: 'POST' });
+            if (!resp.ok) { msg.textContent = '启动 2FA 失败'; return; }
+            const payload = await resp.json();
+            const otpauth = payload.otpauth_url;
+            // try client-side QR generation first (avoid external image blocks)
+            try {
+                // use qrcode library if available
+                if (window.QRCode && QRCode.toDataURL) {
+                    QRCode.toDataURL(otpauth, { width: 200, margin: 1 })
+                        .then(url => { qrImg.src = url; })
+                        .catch(() => { qrImg.src = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(otpauth)}`; });
+                } else if (window.QRCode) {
+                    // older QRCode lib creates a DOM element; render into a temporary div
+                    const tmp = document.createElement('div');
+                    new QRCode(tmp, { text: otpauth, width: 200, height: 200 });
+                    // extract dataURL from generated canvas or img
+                    const imgEl = tmp.querySelector('img');
+                    if (imgEl && imgEl.src) qrImg.src = imgEl.src;
+                    else qrImg.src = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(otpauth)}`;
+                } else {
+                    // fallback to Google Chart API
+                    qrImg.src = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(otpauth)}`;
+                }
+            } catch (err) {
+                console.warn('QR generation failed, falling back to chart API', err);
+                qrImg.src = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(otpauth)}`;
+            }
+            qrArea.style.display = 'block';
+        } catch (err) {
+            console.error(err);
+            msg.textContent = '网络或服务器错误';
+        }
+    });
+
+    verifyBtn && verifyBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        msg.textContent = '';
+        const code = (codeInput.value || '').trim();
+        if (!code) { msg.textContent = '请输入验证码'; return; }
+        try {
+            const resp = await fetchWithAuthRetry('/api/auth/2fa/verify/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code }),
+            });
+            if (!resp.ok) { msg.textContent = '验证码验证失败'; return; }
+            const payload = await resp.json();
+            if (payload.recovery_codes) {
+                recoveryList.textContent = payload.recovery_codes.join('\n');
+                recoveryBlock.style.display = 'block';
+            }
+            document.getElementById('twofa-enabled').textContent = '已启用';
+            msg.textContent = '2FA 已启用';
+        } catch (err) {
+            console.error(err);
+            msg.textContent = '网络或服务器错误';
+        }
+    });
+    // change password handler
+    const changeBtn = document.getElementById('change-password-btn');
+    const oldInput = document.getElementById('old-password');
+    const newInput = document.getElementById('new-password');
+    const changeMsg = document.getElementById('change-password-msg');
+    changeBtn && changeBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        changeMsg.textContent = '';
+        const oldp = (oldInput.value || '').trim();
+        const newp = (newInput.value || '').trim();
+        if (!oldp || !newp) { changeMsg.textContent = '请输入当前密码和新密码'; return; }
+        try {
+            const resp = await fetchWithAuthRetry('/api/auth/password/change/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ old_password: oldp, new_password: newp }),
+            });
+            if (!resp.ok) {
+                const payload = await resp.json().catch(() => ({}));
+                changeMsg.textContent = (payload.detail || payload.message || '修改失败');
+                return;
+            }
+            changeMsg.textContent = '密码已修改';
+            oldInput.value = '';
+            newInput.value = '';
+        } catch (err) {
+            console.error(err);
+            changeMsg.textContent = '网络或服务器错误';
+        }
+    });
+});
+</script>
+
+<!-- Load a small QR code library (uses CDN) for client-side generation -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
 
 {% endblock %}

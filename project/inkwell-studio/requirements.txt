@@ -9,3 +9,6 @@ redis==5.2.1
 bleach==6.2.0
 Markdown==3.7
 Pillow==12.2.0
+gunicorn==21.2.0
+psycopg[binary]==3.3.4
+pyotp==2.9.0

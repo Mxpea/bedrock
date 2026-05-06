@@ -545,15 +545,59 @@ function setupAuthForms() {
 
             try {
                 const csrfToken = getCookie("csrftoken");
-                const response = await fetch(endpoint, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        ...(csrfToken ? {"X-CSRFToken": csrfToken} : {}),
-                    },
-                    body: JSON.stringify(data),
-                });
-                const payload = await response.json().catch(() => ({}));
+                
+                const doRequest = async (requestData) => {
+                    const res = await fetch(endpoint, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            ...(csrfToken ? {"X-CSRFToken": csrfToken} : {}),
+                        },
+                        body: JSON.stringify(requestData),
+                    });
+                    const pay = await res.json().catch(() => ({}));
+                    return { response: res, payload: pay };
+                };
+
+                let { response, payload } = await doRequest(data);
+
+                if (!response.ok && kind === "login" && payload.detail && payload.detail.includes("Two-factor code")) {
+                    const modal = document.getElementById("totpModal");
+                    if (modal) {
+                        modal.showModal();
+                        const totpForm = document.getElementById("totpForm");
+                        
+                        const proceed = await new Promise((resolve) => {
+                            totpForm.onsubmit = (e) => {
+                                e.preventDefault();
+                                const code = new FormData(totpForm).get("otp_or_recovery").trim();
+                                if (code.length === 6 && /^\d+$/.test(code)) {
+                                    data.otp = code;
+                                    delete data.recovery_code;
+                                } else {
+                                    data.recovery_code = code;
+                                    delete data.otp;
+                                }
+                                resolve(true);
+                            };
+                            modal.querySelector(".cancel-btn").onclick = () => {
+                                resolve(false);
+                            };
+                        });
+                        
+                        modal.close();
+                        if (!proceed) {
+                            if (message) message.textContent = "已取消登录验证。";
+                            return;
+                        }
+                        
+                        if (message) message.textContent = "验证中...";
+                        const retry = await doRequest(data);
+                        response = retry.response;
+                        payload = retry.payload;
+                        totpForm.reset();
+                    }
+                }
 
                 if (!response.ok) {
                     if (message) {
