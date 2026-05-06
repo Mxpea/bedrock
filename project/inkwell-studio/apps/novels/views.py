@@ -259,6 +259,13 @@ class CharacterViewSet(viewsets.ModelViewSet):
             novel__is_deleted=False,
         )
 
+        novel_id = self.request.GET.get("novel")
+        if novel_id:
+            char_filter = Q(novel__public_id=novel_id)
+            if str(novel_id).isdigit():
+                char_filter |= Q(novel_id=novel_id)
+            queryset = queryset.filter(char_filter)
+
         keyword = (self.request.GET.get("q") or "").strip()
         if keyword:
             queryset = queryset.filter(
@@ -396,6 +403,13 @@ class WorldviewEntryViewSet(viewsets.ModelViewSet):
             novel__author=self.request.user,
             novel__is_deleted=False,
         )
+
+        novel_id = self.request.GET.get("novel")
+        if novel_id:
+            wv_filter = Q(novel__public_id=novel_id)
+            if str(novel_id).isdigit():
+                wv_filter |= Q(novel_id=novel_id)
+            queryset = queryset.filter(wv_filter)
 
         keyword = (self.request.GET.get("q") or "").strip()
         if keyword:

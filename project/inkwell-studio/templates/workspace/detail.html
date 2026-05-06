@@ -722,7 +722,7 @@ document.addEventListener('DOMContentLoaded', () => {
 {% endif %}
 
 {% if module == 'outline' %}
-{{ outline_canvas|json_script:"outline-initial-data" }}
+{{ workspace.outline_canvas|json_script:"outline-initial-data" }}
 <script src="{% static 'js/outline.js' %}"></script>
 {% endif %}
 
