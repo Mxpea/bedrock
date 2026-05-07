@@ -268,6 +268,11 @@ class UserDetailAdminView(AdminRequiredMixin, TemplateView):
     def get_user_obj(self):
         return get_object_or_404(User, id=self.kwargs.get("user_id"))
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["target_user"] = self.get_user_obj()
+        return context
+
     def post(self, request, *args, **kwargs):
         user_obj = self.get_user_obj()
         action = request.POST.get("action")
