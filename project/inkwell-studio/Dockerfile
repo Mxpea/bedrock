@@ -25,7 +25,4 @@ RUN mkdir -p /app/staticfiles /app/media \
 # 3. 再将整个 /app 的所有权移交给 app（可选，但建议保留）
 RUN chown -R app:app /app
 
-# 切换到非 root 用户
-USER app
-
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
